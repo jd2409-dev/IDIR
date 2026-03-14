@@ -29,18 +29,18 @@ TRAINING_CONFIG = {
     "reasoning_hidden_dim": 2560,
     "max_iterations": 20,
     "tolerance": 1e-3,
-    "batch_size": 16,
+    "batch_size": 32,
     "learning_rate": 3e-4,
     "aggressive_lr_multiplier": 3.0,
     "warmup_fraction": 0.03,
-    "phase1_epochs": 3000,
-    "phase1_batches": 1000,
-    "phase2_epochs": 500,
-    "phase2_batches": 500,
-    "phase3_epochs": 500,
-    "phase3_batches": 500,
-    "phase4_epochs": 500,
-    "phase4_batches": 500,
+    "phase1_epochs": 300,
+    "phase1_batches": 400,
+    "phase2_epochs": 100,
+    "phase2_batches": 200,
+    "phase3_epochs": 100,
+    "phase3_batches": 200,
+    "phase4_epochs": 100,
+    "phase4_batches": 200,
     "seq_len": 128,
     "save_every": 100,
     "log_every": 10,
@@ -154,7 +154,9 @@ def generate_arithmetic_data(batch_size, seq_len):
         elif op == 1:
             bigger = max(a, b)
             smaller = min(a, b)
-            prompt = f"What is {bigger} minus {smaller}? The answer is {bigger - smaller}."
+            prompt = (
+                f"What is {bigger} minus {smaller}? The answer is {bigger - smaller}."
+            )
         else:
             prompt = f"What is {a} times {b}? The answer is {a * b}."
         prompts.append(prompt)
