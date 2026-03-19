@@ -1,7 +1,15 @@
+import sys
+from pathlib import Path
+
 import torch
 from transformers import GPT2Tokenizer
-from idir_model import IDIRModel
 import argparse
+
+PACKAGE_ROOT = Path(__file__).resolve().parent
+if str(PACKAGE_ROOT) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_ROOT))
+
+from idir_model import IDIRModel
 
 def main(args):
     """Main function to run the chatbot."""
@@ -13,7 +21,7 @@ def main(args):
     tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
     tokenizer.pad_token = tokenizer.eos_token
     
-    model = IDIRModel(vocab_size=tokenizer.vocab_size, d=512)
+    model = IDIRModel(vocab_size=tokenizer.vocab_size, hidden_dim=512)
     
     if args.checkpoint_path:
         try:
