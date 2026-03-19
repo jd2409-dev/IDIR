@@ -358,3 +358,69 @@ if __name__ == "__main__":
     print(f"Output logits shape: {logits.shape}")
     print(f"Average iterations for convergence: {iterations}")
     print(f"Input tensor shape: {input_tensor.shape}")
+
+
+
+class IDIRModel(IDIR):
+    """
+    Convenience wrapper that exposes a simple generation API for interactive usage.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _sample_next_tokens(self, logits, temperature, top_k):
+        if temperature != 1.0:
+            logits = logits / temperature
+
+        if top_k and top_k > 0:
+            topk_logits, topk_indices = torch.topk(logits, top_k, dim=-1)
+            probs = F.softmax(topk_logits, dim=-1)
+            sampled = torch.multinomial(probs, 1)
+            next_tokens = topk_indices.gather(-1, sampled)
+        else:
+            probs = F.softmax(logits, dim=-1)
+            next_tokens = torch.multinomial(probs, 1)
+
+        return next_tokens
+
+    def generate(
+        self,
+        input_ids,
+        attention_mask=None,
+        max_length=100,
+        num_beams=1,
+        temperature=1.0,
+        top_k=0,
+        pad_token_id=None,
+        eos_token_id=None,
+        **kwargs,
+    ):
+        """
+        Naive autoregressive generation loop with optional top-k filtering.
+        Only supports single-batch or simple sampling (no real beam search yet).
+        """
+        device = input_ids.device
+        batch_size = input_ids.shape[0]
+        prompt_length = input_ids.shape[1]
+
+        if prompt_length >= max_length:
+            return input_ids
+
+        output_ids = input_ids.clone()
+
+        eos_token_id = eos_token_id or pad_token_id
+        finished = torch.zeros(batch_size, dtype=torch.bool, device=device)
+
+        for _ in range(max_length - prompt_length):
+            logits, _ = self(output_ids)
+            next_logits = logits[:, -1, :]
+            next_tokens = self._sample_next_tokens(next_logits, temperature, top_k)
+            output_ids = torch.cat([output_ids, next_tokens], dim=-1)
+
+            if eos_token_id is not None:
+                finished |= next_tokens.squeeze(-1) == eos_token_id
+                if finished.all():
+                    break
+
+        return output_ids
