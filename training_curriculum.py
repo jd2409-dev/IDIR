@@ -35,7 +35,12 @@ def get_vram_config():
         return "rtx_3050_8gb"
     elif "3050" in gpu_name:
         return "rtx_3050_4gb"
-    elif "3060" in gpu_name or "3070" in gpu_name or "3080" in gpu_name or "3090" in gpu_name:
+    elif (
+        "3060" in gpu_name
+        or "3070" in gpu_name
+        or "3080" in gpu_name
+        or "3090" in gpu_name
+    ):
         return "high_end"
     elif total_memory >= 16:
         return "16gb"
@@ -46,6 +51,7 @@ VRAM_MODE = get_vram_config()
 print(f"Detected VRAM mode: {VRAM_MODE}")
 
 # Extended VRAM configurations for different GPU tiers
+# Optimized for maximum coding capability training
 VRAM_CONFIGS = {
     "high_end": {
         "batch_size": 256,
@@ -66,22 +72,22 @@ VRAM_CONFIGS = {
         "gradient_accumulation_steps": 1,
     },
     "rtx_3050_8gb": {
-        "batch_size": 128,
+        "batch_size": 96,  # Optimized for 8GB with mixed precision
         "seq_len": 512,
         "hidden_dim": 512,
         "expert_hidden_dim": 2048,
         "max_iterations": 12,
         "compile_model": True,
-        "gradient_accumulation_steps": 1,
+        "gradient_accumulation_steps": 2,  # Effective batch size 192
     },
     "rtx_3050_4gb": {
-        "batch_size": 64,
+        "batch_size": 48,
         "seq_len": 256,
         "hidden_dim": 384,
         "expert_hidden_dim": 1536,
         "max_iterations": 8,
         "compile_model": True,
-        "gradient_accumulation_steps": 1,
+        "gradient_accumulation_steps": 2,
     },
     "low": {
         "batch_size": 32,
@@ -96,16 +102,19 @@ VRAM_CONFIGS = {
 
 vram_cfg = VRAM_CONFIGS[VRAM_MODE]
 
-# Training time configuration - Optimized for < 1 hour
-TARGET_TRAINING_TIME_HOURS = 0.9  # Target under 1 hour with buffer
-TOTAL_STEPS_PHASE1 = 500   # Reduced for speed
-TOTAL_STEPS_PHASE2_4 = 200  # Reduced for speed
+# Training time configuration - Aggressive optimization for < 1 hour on RTX 3050 6GB
+TARGET_TRAINING_TIME_HOURS = 0.90  # Target 54 minutes to allow for overhead
+TOTAL_STEPS_PHASE1 = 600  # Language pretraining - heavy code focus (reduced for time)
+TOTAL_STEPS_PHASE2 = 300  # Algorithmic reasoning (reduced for time)
+TOTAL_STEPS_PHASE3 = 400  # Distillation from code teacher (reduced for time)
+TOTAL_STEPS_PHASE4 = 200  # Self-consistency on code (reduced for time)
 
+# Phase rebalancing: More time on code-heavy phases
 PHASE_TIME_ALLOCATION = {
-    "phase_1": 0.35,
-    "phase_2": 0.20,
-    "phase_3": 0.25,
-    "phase_4": 0.20,
+    "phase_1": 0.30,  # Language pretraining with code emphasis (reduced)
+    "phase_2": 0.10,  # Algorithmic tasks (reduced)
+    "phase_3": 0.40,  # Teacher distillation (code-focused) (increased)
+    "phase_4": 0.20,  # Self-consistency (increased)
 }
 PHASE_TIME_BUDGETS = {
     phase: int(TARGET_TRAINING_TIME_HOURS * 3600 * ratio)
@@ -113,118 +122,697 @@ PHASE_TIME_BUDGETS = {
 }
 
 # Extended high-quality dataset configuration - ALL PUBLIC, NON-GATED DATASETS
-# Verified available on Hugging Face without authentication
+# Optimized for elite coding capability - heavily weighted toward code datasets
+# Target: Claude Opus / GPT-5 level coding performance
 LANGUAGE_DATASETS_CONFIG = [
-    # Wikipedia - high quality encyclopedic knowledge (PUBLIC)
-    {"path": "wikitext", "name": "wikitext-103-raw-v1", "split": "train", "text_field": "text", "weight": 0.12},
-    {"path": "wikitext", "name": "wikitext-2-raw-v1", "split": "train", "text_field": "text", "weight": 0.04},
-
-    # Web text - diverse internet text (PUBLIC)
-    {"path": "openwebtext", "split": "train", "text_field": "text", "weight": 0.10},
-
-    # Books - narrative and literary text (PUBLIC)
-    {"path": "bookcorpus", "split": "train", "text_field": "text", "weight": 0.08},
-
-    # C4 - cleaned Common Crawl (PUBLIC)
-    {"path": "c4", "name": "en", "split": "train", "text_field": "text", "weight": 0.10},
-
-    # OSCAR - multilingual web corpus (PUBLIC)
-    {"path": "oscar", "name": "unshuffled_deduplicated_en", "split": "train", "text_field": "text", "weight": 0.06},
-
-    # Instruction/Reasoning datasets - ALL PUBLIC
-    {"path": "stingning/ultrachat", "split": "train", "text_field": "text", "weight": 0.08},
-    {"path": "Open-Orca/OpenOrca", "split": "train", "text_field": "question", "weight": 0.06},
-    {"path": "Open-Orca/OpenOrca", "split": "train", "text_field": "response", "weight": 0.06},
-    {"path": "tatsu-lab/alpaca", "split": "train", "text_field": "instruction", "weight": 0.04},
-    {"path": "tatsu-lab/alpaca", "split": "train", "text_field": "output", "weight": 0.04},
-    {"path": "timdettmers/openassistant-guanaco", "split": "train", "text_field": "text", "weight": 0.04},
-
-    # Chain-of-thought and math reasoning - PUBLIC
-    {"path": "gsm8k", "name": "main", "split": "train", "text_field": "question", "weight": 0.03},
-    {"path": "gsm8k", "name": "main", "split": "train", "text_field": "answer", "weight": 0.03},
-
-    # Code datasets - for structured reasoning (PUBLIC)
-    {"path": "codeparrot/github-code", "name": "Python", "split": "train", "text_field": "code", "weight": 0.05},
-    {"path": "code_search_net", "name": "python", "split": "train", "text_field": "code", "weight": 0.03},
-
-    # Scientific papers - technical reasoning (PUBLIC)
-    {"path": "scientific_papers", "name": "pubmed", "split": "train", "text_field": "article", "weight": 0.04},
-    {"path": "scientific_papers", "name": "arxiv", "split": "train", "text_field": "article", "weight": 0.03},
-
-    # News - factual information (PUBLIC)
-    {"path": "ag_news", "split": "train", "text_field": "text", "weight": 0.03},
-
-    # Reading comprehension (PUBLIC)
-    {"path": "squad", "split": "train", "text_field": "context", "weight": 0.02},
-    {"path": "squad", "split": "train", "text_field": "question", "weight": 0.01},
-
-    # Commonsense reasoning (PUBLIC)
-    {"path": "commonsense_qa", "split": "train", "text_field": "question", "weight": 0.02},
-    {"path": "commonsense_qa", "split": "train", "text_field": "answerKey", "weight": 0.02},
-
-    # Additional high-quality public datasets
-    {"path": "super_glue", "name": "copa", "split": "train", "text_field": "premise", "weight": 0.02},
-    {"path": "super_glue", "name": "copa", "split": "train", "text_field": "question", "weight": 0.01},
-
-    # Natural Instructions (PUBLIC)
-    {"path": "natural_instructions", "split": "train", "text_field": "definition", "weight": 0.02},
-    {"path": "natural_instructions", "split": "train", "text_field": "inputs", "weight": 0.02},
+    # ========== PRIMARY CODE DATASETS (80% total weight) ==========
+    # The Stack v2 - Massive code corpus (50% total)
+    {
+        "path": "bigcode/the-stack-v2",
+        "name": "C",
+        "split": "train",
+        "text_field": "content",
+        "weight": 0.13,
+    },
+    {
+        "path": "bigcode/the-stack-v2",
+        "name": "C-Plus-Plus",
+        "split": "train",
+        "text_field": "content",
+        "weight": 0.12,
+    },
+    {
+        "path": "bigcode/the-stack-v2",
+        "name": "Python",
+        "split": "train",
+        "text_field": "content",
+        "weight": 0.12,
+    },
+    {
+        "path": "bigcode/the-stack-v2",
+        "name": "Rust",
+        "split": "train",
+        "text_field": "content",
+        "weight": 0.07,
+    },
+    {
+        "path": "bigcode/the-stack-v2",
+        "name": "Go",
+        "split": "train",
+        "text_field": "content",
+        "weight": 0.03,
+    },
+    {
+        "path": "bigcode/the-stack-v2",
+        "name": "Assembly",
+        "split": "train",
+        "text_field": "content",
+        "weight": 0.03,
+    },
+    # GitHub Code - Additional code sources (20% total)
+    {
+        "path": "codeparrot/github-code",
+        "name": "C",
+        "split": "train",
+        "text_field": "code",
+        "weight": 0.06,
+    },
+    {
+        "path": "codeparrot/github-code",
+        "name": "C++",
+        "split": "train",
+        "text_field": "code",
+        "weight": 0.05,
+    },
+    {
+        "path": "codeparrot/github-code",
+        "name": "Python",
+        "split": "train",
+        "text_field": "code",
+        "weight": 0.05,
+    },
+    {
+        "path": "codeparrot/github-code",
+        "name": "Rust",
+        "split": "train",
+        "text_field": "code",
+        "weight": 0.02,
+    },
+    {
+        "path": "codeparrot/github-code",
+        "name": "JavaScript",
+        "split": "train",
+        "text_field": "code",
+        "weight": 0.02,
+    },
+    # CodeSearchNet - Code with documentation (8%)
+    {
+        "path": "code_search_net",
+        "name": "python",
+        "split": "train",
+        "text_field": "code",
+        "weight": 0.03,
+    },
+    {
+        "path": "code_search_net",
+        "name": "c",
+        "split": "train",
+        "text_field": "code",
+        "weight": 0.03,
+    },
+    {
+        "path": "code_search_net",
+        "name": "cpp",
+        "split": "train",
+        "text_field": "code",
+        "weight": 0.02,
+    },
+    # Instruction-following code (2%)
+    {
+        "path": "nickrosh/Evol-Instruct-Code-80k-v1",
+        "split": "train",
+        "text_field": "instruction",
+        "weight": 0.01,
+    },
+    {
+        "path": "nickrosh/Evol-Instruct-Code-80k-v1",
+        "split": "train",
+        "text_field": "output",
+        "weight": 0.01,
+    },
+    # ========== REASONING & PROBLEM SOLVING (10%) ==========
+    # Competitive programming (3%)
+    {
+        "path": "deepmind/code_contests",
+        "split": "train",
+        "text_field": "description",
+        "weight": 0.015,
+    },
+    {
+        "path": "deepmind/code_contests",
+        "split": "train",
+        "text_field": "solutions",
+        "weight": 0.015,
+    },
+    # Math reasoning for algorithms (3%)
+    {
+        "path": "gsm8k",
+        "name": "main",
+        "split": "train",
+        "text_field": "question",
+        "weight": 0.015,
+    },
+    {
+        "path": "gsm8k",
+        "name": "main",
+        "split": "train",
+        "text_field": "answer",
+        "weight": 0.015,
+    },
+    # Chain-of-thought reasoning (4%)
+    {
+        "path": "Open-Orca/OpenOrca",
+        "split": "train",
+        "text_field": "question",
+        "weight": 0.02,
+    },
+    {
+        "path": "Open-Orca/OpenOrca",
+        "split": "train",
+        "text_field": "response",
+        "weight": 0.02,
+    },
+    # ========== GENERAL KNOWLEDGE (10%) ==========
+    # Wikipedia - technical knowledge (3%)
+    {
+        "path": "wikitext",
+        "name": "wikitext-103-raw-v1",
+        "split": "train",
+        "text_field": "text",
+        "weight": 0.03,
+    },
+    # Technical documentation (3%)
+    {"path": "EleutherAI/pile", "split": "train", "text_field": "text", "weight": 0.02},
+    {
+        "path": "HuggingFaceFW/fineweb-edu",
+        "name": "CC-MAIN-2024-10",
+        "split": "train",
+        "text_field": "text",
+        "weight": 0.01,
+    },
+    # Web text for diverse patterns (2%)
+    {"path": "openwebtext", "split": "train", "text_field": "text", "weight": 0.01},
+    {
+        "path": "c4",
+        "name": "en",
+        "split": "train",
+        "text_field": "text",
+        "weight": 0.01,
+    },
+    # ========== SPECIALIZED DATASETS ==========
+    # Build systems & tooling (2%)
+    {
+        "path": "codeparrot/github-code",
+        "name": "CMake",
+        "split": "train",
+        "text_field": "code",
+        "weight": 0.01,
+    },
+    {
+        "path": "codeparrot/github-code",
+        "name": "Makefile",
+        "split": "train",
+        "text_field": "code",
+        "weight": 0.01,
+    },
+    # StarCoder data (supplementary)
+    {
+        "path": "bigcode/starcoderdata",
+        "split": "train",
+        "text_field": "content",
+        "weight": 0.02,
+    },
+    # Technical Q&A (2%)
+    {
+        "path": "flax-syrup/stackexchange-programmers",
+        "split": "train",
+        "text_field": "text",
+        "weight": 0.01,
+    },
+    {
+        "path": "natural_instructions",
+        "split": "train",
+        "text_field": "definition",
+        "weight": 0.01,
+    },
 ]
 
 # Extended high-quality synthetic word pool for rich text generation
+# Enhanced with OS-level and systems programming terminology
 REASONING_WORD_POOL = [
     # Core reasoning terms
-    "reasoning", "inference", "deduction", "induction", "abduction",
-    "logical", "conclusion", "premise", "argument", "validity",
-    "syllogism", "proposition", "implication", "entailment",
-    "proof", "verification", "validation", "justification",
-
+    "reasoning",
+    "inference",
+    "deduction",
+    "induction",
+    "abduction",
+    "logical",
+    "conclusion",
+    "premise",
+    "argument",
+    "validity",
+    "syllogism",
+    "proposition",
+    "implication",
+    "entailment",
+    "proof",
+    "verification",
+    "validation",
+    "justification",
     # Mathematical terms
-    "arithmetic", "computation", "calculation", "algorithm",
-    "equation", "function", "variable", "constant", "operation",
-    "sequence", "series", "pattern", "structure", "relation",
-    "theorem", "lemma", "corollary", "axiom", "postulate",
-    "derivative", "integral", "probability", "statistics",
-
+    "arithmetic",
+    "computation",
+    "calculation",
+    "algorithm",
+    "equation",
+    "function",
+    "variable",
+    "constant",
+    "operation",
+    "sequence",
+    "series",
+    "pattern",
+    "structure",
+    "relation",
+    "theorem",
+    "lemma",
+    "corollary",
+    "axiom",
+    "postulate",
+    "derivative",
+    "integral",
+    "probability",
+    "statistics",
     # Scientific terms
-    "hypothesis", "experiment", "evidence", "observation",
-    "analysis", "synthesis", "evaluation", "interpretation",
-    "theory", "model", "framework", "principle", "law",
-    "methodology", "empirical", "phenomenon", "mechanism",
-
+    "hypothesis",
+    "experiment",
+    "evidence",
+    "observation",
+    "analysis",
+    "synthesis",
+    "evaluation",
+    "interpretation",
+    "theory",
+    "model",
+    "framework",
+    "principle",
+    "law",
+    "methodology",
+    "empirical",
+    "phenomenon",
+    "mechanism",
     # Cognitive terms
-    "cognition", "perception", "memory", "learning", "understanding",
-    "comprehension", "knowledge", "belief", "thought", "concept",
-    "metacognition", "intuition", "insight", "awareness", "consciousness",
-
+    "cognition",
+    "perception",
+    "memory",
+    "learning",
+    "understanding",
+    "comprehension",
+    "knowledge",
+    "belief",
+    "thought",
+    "concept",
+    "metacognition",
+    "intuition",
+    "insight",
+    "awareness",
+    "consciousness",
     # Process terms
-    "iteration", "recursion", "convergence", "divergence",
-    "transformation", "translation", "mapping", "correspondence",
-    "abstraction", "generalization", "specialization",
-    "optimization", "refinement", "progression", "regression",
-
+    "iteration",
+    "recursion",
+    "convergence",
+    "divergence",
+    "transformation",
+    "translation",
+    "mapping",
+    "correspondence",
+    "abstraction",
+    "generalization",
+    "specialization",
+    "optimization",
+    "refinement",
+    "progression",
+    "regression",
     # System terms
-    "system", "component", "module", "interface", "protocol",
-    "architecture", "design", "implementation", "integration",
-    "hierarchy", "structure", "organization", "coordination",
-
+    "system",
+    "component",
+    "module",
+    "interface",
+    "protocol",
+    "architecture",
+    "design",
+    "implementation",
+    "integration",
+    "hierarchy",
+    "structure",
+    "organization",
+    "coordination",
     # Context terms
-    "context", "domain", "scope", "range", "field", "area",
-    "environment", "setting", "situation", "circumstance",
-    "perspective", "viewpoint", "standpoint", "framework",
-
+    "context",
+    "domain",
+    "scope",
+    "range",
+    "field",
+    "area",
+    "environment",
+    "setting",
+    "situation",
+    "circumstance",
+    "perspective",
+    "viewpoint",
+    "standpoint",
+    "framework",
     # Instruction/QA terms
-    "instruction", "question", "answer", "query", "response",
-    "explanation", "clarification", "elaboration", "example",
-    "demonstration", "illustration", "guidance", "direction",
-
+    "instruction",
+    "question",
+    "answer",
+    "query",
+    "response",
+    "explanation",
+    "clarification",
+    "elaboration",
+    "example",
+    "demonstration",
+    "illustration",
+    "guidance",
+    "direction",
     # Code/programming terms
-    "function", "variable", "loop", "condition", "algorithm",
-    "implementation", "execution", "compilation", "runtime",
-    "syntax", "semantics", "structure", "module", "class",
+    "function",
+    "variable",
+    "loop",
+    "condition",
+    "algorithm",
+    "implementation",
+    "execution",
+    "compilation",
+    "runtime",
+    "syntax",
+    "semantics",
+    "structure",
+    "module",
+    "class",
+    # ========== OS-LEVEL SYSTEMS PROGRAMMING TERMS ==========
+    # Operating System Core Concepts
+    "kernel",
+    "operating",
+    "system",
+    "scheduler",
+    "process",
+    "thread",
+    "task",
+    "interrupt",
+    "handler",
+    "trap",
+    "exception",
+    "syscall",
+    "privilege",
+    "ring",
+    "mode",
+    "supervisor",
+    "userland",
+    "kernelspace",
+    "monolithic",
+    "microkernel",
+    "hybrid",
+    "exokernel",
+    "nanokernel",
+    # Memory Management
+    "memory",
+    "allocation",
+    "deallocation",
+    "malloc",
+    "free",
+    "heap",
+    "stack",
+    "paging",
+    "page",
+    "frame",
+    "segmentation",
+    "virtual",
+    "physical",
+    "address",
+    "translation",
+    "MMU",
+    "TLB",
+    "cache",
+    "buffer",
+    "swap",
+    "paging",
+    "demand",
+    "copy-on-write",
+    "fork",
+    # Process Management
+    "process",
+    "thread",
+    "concurrency",
+    "parallelism",
+    "synchronization",
+    "mutex",
+    "semaphore",
+    "spinlock",
+    "deadlock",
+    "livelock",
+    "race",
+    "condition",
+    "barrier",
+    "atomic",
+    "critical",
+    "section",
+    "context",
+    "switch",
+    "preemption",
+    "dispatch",
+    "quantum",
+    "timeslice",
+    "priority",
+    # File Systems
+    "filesystem",
+    "inode",
+    "block",
+    "superblock",
+    "directory",
+    "metadata",
+    "journal",
+    "journaling",
+    "ext2",
+    "ext3",
+    "ext4",
+    "btrfs",
+    "zfs",
+    "fat32",
+    "ntfs",
+    "mount",
+    "unmount",
+    "path",
+    "inode",
+    "dentry",
+    # Device Drivers
+    "driver",
+    "device",
+    "character",
+    "block",
+    "network",
+    "pci",
+    "usb",
+    "serial",
+    "parallel",
+    "dma",
+    "irq",
+    "port",
+    "register",
+    "firmware",
+    "hardware",
+    "controller",
+    "bus",
+    "i2c",
+    "spi",
+    "uart",
+    "gpio",
+    # Networking Stack
+    "network",
+    "socket",
+    "tcp",
+    "udp",
+    "ip",
+    "ethernet",
+    "packet",
+    "frame",
+    "datagram",
+    "protocol",
+    "stack",
+    "layer",
+    "transport",
+    "network",
+    "datalink",
+    "physical",
+    "routing",
+    "switching",
+    "bridge",
+    "firewall",
+    "nat",
+    "port",
+    "bind",
+    "listen",
+    "accept",
+    "connect",
+    # Boot and Initialization
+    "boot",
+    "bootloader",
+    "grub",
+    "uefi",
+    "bios",
+    "mbr",
+    "gpt",
+    "initrd",
+    "initramfs",
+    "kernel",
+    "parameter",
+    "command",
+    "line",
+    "startup",
+    "initialization",
+    "daemon",
+    "service",
+    "init",
+    "systemd",
+    # Assembly and Low-level
+    "assembly",
+    "assembler",
+    "instruction",
+    "opcode",
+    "operand",
+    "register",
+    "accumulator",
+    "stack",
+    "pointer",
+    "instruction",
+    "counter",
+    "flag",
+    "carry",
+    "zero",
+    "overflow",
+    "sign",
+    "interrupt",
+    "enable",
+    "push",
+    "pop",
+    "call",
+    "ret",
+    "jump",
+    "branch",
+    "label",
+    "section",
+    "text",
+    "data",
+    "bss",
+    "heap",
+    "stack",
+    "frame",
+    "prologue",
+    "epilogue",
+    "calling",
+    "convention",
+    "abi",
+    "elf",
+    "binary",
+    "object",
+    "linker",
+    "loader",
+    # C Programming Systems
+    "pointer",
+    "dereference",
+    "reference",
+    "malloc",
+    "calloc",
+    "realloc",
+    "free",
+    "sizeof",
+    "offsetof",
+    "struct",
+    "union",
+    "typedef",
+    "enum",
+    "volatile",
+    "const",
+    "restrict",
+    "inline",
+    "static",
+    "extern",
+    "header",
+    "source",
+    "preprocessor",
+    "macro",
+    "conditional",
+    "compilation",
+    "library",
+    "shared",
+    "static",
+    "dynamic",
+    "linking",
+    "loading",
+    "symbol",
+    "export",
+    # Security
+    "security",
+    "permission",
+    "access",
+    "control",
+    "authentication",
+    "authorization",
+    "encryption",
+    "decryption",
+    "hash",
+    "checksum",
+    "signature",
+    "certificate",
+    "public",
+    "private",
+    "key",
+    "cipher",
+    "plaintext",
+    "ciphertext",
+    "nonce",
+    "salt",
+    "stretching",
+    "bcrypt",
+    "selinux",
+    "apparmor",
+    "capabilities",
+    "chroot",
+    "namespace",
+    "cgroup",
+    # Virtualization
+    "virtualization",
+    "hypervisor",
+    "vm",
+    "guest",
+    "host",
+    "kvm",
+    "qemu",
+    "xen",
+    "vmware",
+    "virtualbox",
+    "container",
+    "docker",
+    "namespace",
+    "cgroup",
+    "control",
+    "group",
+    "isolation",
+    "sandbox",
+    "jail",
+    # Debugging and Development
+    "debugger",
+    "gdb",
+    "breakpoint",
+    "watchpoint",
+    "single",
+    "step",
+    "trace",
+    "profiling",
+    "profiler",
+    "valgrind",
+    "asan",
+    "tsan",
+    "sanitizer",
+    "memory",
+    "leak",
+    "buffer",
+    "overflow",
+    "underflow",
 ]
 
-# Training configuration
+# Training configuration - Aggressive settings for elite coding performance
 TRAINING_CONFIG = {
     "device": device,
     "vocab_size": 50257,
@@ -238,17 +826,17 @@ TRAINING_CONFIG = {
     "tolerance": 1e-4,
     "batch_size": vram_cfg["batch_size"],
     "seq_len": vram_cfg["seq_len"],
-    "learning_rate": 3e-4,
-    "min_learning_rate": 1e-6,
-    "aggressive_lr_multiplier": 2.0,
-    "warmup_fraction": 0.05,
+    "learning_rate": 5e-4,  # Increased for faster convergence
+    "min_learning_rate": 1e-7,  # Lower for fine-tuning
+    "aggressive_lr_multiplier": 3.0,  # More aggressive LR scaling
+    "warmup_fraction": 0.03,  # Shorter warmup
     "phase1_steps": TOTAL_STEPS_PHASE1,
-    "phase2_steps": TOTAL_STEPS_PHASE2_4,
-    "phase3_steps": TOTAL_STEPS_PHASE2_4,
-    "phase4_steps": TOTAL_STEPS_PHASE2_4,
-    "save_every": 100,
-    "log_every": 50,  # Log less frequently for speed
-    "eval_every": 100,
+    "phase2_steps": TOTAL_STEPS_PHASE2,
+    "phase3_steps": TOTAL_STEPS_PHASE3,
+    "phase4_steps": TOTAL_STEPS_PHASE4,
+    "save_every": 150,  # Less frequent saves for speed
+    "log_every": 75,
+    "eval_every": 150,
     "max_grad_norm": 1.0,
     "use_mixed_precision": True,
     "mixed_precision_dtype": "bfloat16",
@@ -256,17 +844,19 @@ TRAINING_CONFIG = {
     "compile_model": vram_cfg["compile_model"],
     "gradient_accumulation_steps": vram_cfg.get("gradient_accumulation_steps", 1),
     "checkpoint_dir": "checkpoints",
-    "num_workers": 2,  # Reduced for stability
-    "prefetch_factor": 8,  # Increased for efficiency
+    "num_workers": 0,  # Use main process for data loading (more stable)
+    "prefetch_factor": 4,  # Balanced for RTX 3050
     "phase_time_budgets": PHASE_TIME_BUDGETS,
-    "data_expansion_factor": 12,  # Increased for more variety per batch
-    "synthetic_text_ratio": 0.20,  # Reduced to favor real data
+    "data_expansion_factor": 20,  # Higher variety per batch
+    "synthetic_text_ratio": 0.10,  # Favor real code heavily
     "synthetic_word_pool": REASONING_WORD_POOL,
     "language_datasets": LANGUAGE_DATASETS_CONFIG,
     "use_weighted_sampling": True,
-    "validation_split": 0.005,  # Smaller validation for speed
-    "patience": 3,  # Reduced for faster phases
-    "min_delta": 0.001,
+    "validation_split": 0.003,  # Minimal validation
+    "patience": 5,  # More patience for better convergence
+    "min_delta": 0.0005,  # Tighter convergence threshold
+    "code_focus": True,  # Enable code-specific optimizations
+    "error_correction_training": True,  # Train on error correction
 }
 
 os.makedirs(TRAINING_CONFIG["checkpoint_dir"], exist_ok=True)
@@ -306,7 +896,9 @@ class ImprovedDataLoader:
     def _sample_dataset_index(self):
         """Sample dataset index using weighted sampling."""
         if self.weights:
-            return random.choices(range(len(self.datasets)), weights=self.weights, k=1)[0]
+            return random.choices(range(len(self.datasets)), weights=self.weights, k=1)[
+                0
+            ]
         return random.randint(0, len(self.datasets) - 1)
 
     def _extract_text(self, example, text_field):
@@ -330,8 +922,28 @@ class ImprovedDataLoader:
         if len(text.strip()) < 20:
             return None
 
-        # Basic quality filtering
-        if text.count('.') < 1 and text.count('?') < 1 and text.count('!') < 1:
+        # Basic quality filtering - allow code patterns with braces, semicolons, comments
+        has_prose_punctuation = (
+            text.count(".") >= 1 or text.count("?") >= 1 or text.count("!") >= 1
+        )
+        has_code_indicators = (
+            text.count(";") >= 1
+            or text.count("{") >= 1
+            or text.count("}") >= 1
+            or text.count("(") >= 1
+            or text.count(")") >= 1
+            or text.count("//") >= 1
+            or text.count("/*") >= 1
+            or text.count("#include") >= 1
+            or text.count("#define") >= 1
+            or text.count("def ") >= 1
+            or text.count("class ") >= 1
+            or text.count("int ") >= 1
+            or text.count("void ") >= 1
+            or text.count("void*") >= 1
+            or text.count("struct ") >= 1
+        )
+        if not has_prose_punctuation and not has_code_indicators:
             return None
 
         return text
@@ -362,19 +974,35 @@ class ImprovedDataLoader:
 
     def _make_synthetic_text(self):
         """Generate higher-quality synthetic text with diverse patterns."""
-        # Extended pattern types for richer synthetic data
-        pattern = random.choice([
-            "reasoning_chain",
-            "definition",
-            "explanation",
-            "comparison",
-            "process",
-            "instruction",
-            "qa_format",
-            "mathematical",
-            "code_like",
-            "deduction",
-        ])
+        # Extended pattern types for richer synthetic data including OS-level coding
+        pattern = random.choice(
+            [
+                "reasoning_chain",
+                "definition",
+                "explanation",
+                "comparison",
+                "process",
+                "instruction",
+                "qa_format",
+                "mathematical",
+                "code_like",
+                "deduction",
+                "syscall_pattern",
+                "driver_pattern",
+                "memory_mgmt",
+                "boot_sequence",
+                "interrupt_handler",
+                "humaneval_pattern",
+                "c_function",
+                "rust_function",
+                "code_debug",
+                "api_usage",
+                "data_structure",
+                "design_pattern",
+                "error_handling",
+                "concurrency",
+            ]
+        )
 
         if pattern == "reasoning_chain":
             # Create a simple reasoning chain
@@ -383,25 +1011,42 @@ class ImprovedDataLoader:
             for i in range(num_steps):
                 word = random.choice(self.synthetic_word_pool)
                 num = random.randint(1, 100)
-                steps.append(f"Step {i+1}: The {word} value is {num}.")
+                steps.append(f"Step {i + 1}: The {word} value is {num}.")
             result = random.randint(1, 1000)
             text = " ".join(steps) + f" Therefore, the result is {result}."
 
         elif pattern == "definition":
             term = random.choice(self.synthetic_word_pool)
             aspects = random.sample(self.synthetic_word_pool, 2)
-            connectors = ["involving", "related to", "connected with", "associated with", "derived from"]
+            connectors = [
+                "involving",
+                "related to",
+                "connected with",
+                "associated with",
+                "derived from",
+            ]
             text = f"{term} refers to a process {random.choice(connectors)} {aspects[0]} and {aspects[1]}."
 
         elif pattern == "explanation":
             concept = random.choice(self.synthetic_word_pool)
             detail = random.choice(self.synthetic_word_pool)
-            starters = ["When analyzing", "In understanding", "To comprehend", "When examining"]
+            starters = [
+                "When analyzing",
+                "In understanding",
+                "To comprehend",
+                "When examining",
+            ]
             text = f"{random.choice(starters)} {concept}, we consider the {detail} aspect carefully."
 
         elif pattern == "comparison":
             terms = random.sample(self.synthetic_word_pool, 2)
-            connectors = ["focuses on", "emphasizes", "prioritizes", "centers on", "deals with"]
+            connectors = [
+                "focuses on",
+                "emphasizes",
+                "prioritizes",
+                "centers on",
+                "deals with",
+            ]
             c1, c2 = random.choice(connectors), random.choice(connectors)
             text = f"While {terms[0]} {c1} structure, {terms[1]} {c2} function."
 
@@ -413,13 +1058,27 @@ class ImprovedDataLoader:
             text = f"{random.choice(starters)} apply {words[0]}, {random.choice(connectors)} integrate with {words[1]} using {words[2]} {random.choice(endings)}."
 
         elif pattern == "instruction":
-            action = random.choice(["Explain", "Describe", "Analyze", "Define", "Compare"])
+            action = random.choice(
+                ["Explain", "Describe", "Analyze", "Define", "Compare"]
+            )
             term = random.choice(self.synthetic_word_pool)
-            contexts = ["in detail", "briefly", "with examples", "step by step", "in your own words"]
+            contexts = [
+                "in detail",
+                "briefly",
+                "with examples",
+                "step by step",
+                "in your own words",
+            ]
             text = f"Instruction: {action} the concept of {term} {random.choice(contexts)}."
 
         elif pattern == "qa_format":
-            question_words = ["What is", "How does", "Why is", "When should", "Where does"]
+            question_words = [
+                "What is",
+                "How does",
+                "Why is",
+                "When should",
+                "Where does",
+            ]
             term = random.choice(self.synthetic_word_pool)
             aspect = random.choice(self.synthetic_word_pool)
             q = f"{random.choice(question_words)} {term} related to {aspect}?"
@@ -433,19 +1092,362 @@ class ImprovedDataLoader:
             symbol, name = op[0], op[1:]
             if name == "subtraction":
                 a, b = max(a, b), min(a, b)
-            result = {"addition": a+b, "subtraction": a-b, "multiplication": a*b, "division": a//max(b,1)}[name]
+            result = {
+                "addition": a + b,
+                "subtraction": a - b,
+                "multiplication": a * b,
+                "division": a // max(b, 1),
+            }[name]
             text = f"Calculate {a} {symbol} {b} using {name}. The answer is {result}."
 
         elif pattern == "code_like":
             func = random.choice(["function", "procedure", "method", "routine"])
             var = random.choice(self.synthetic_word_pool)
-            action = random.choice(["computes", "calculates", "determines", "evaluates"])
+            action = random.choice(
+                ["computes", "calculates", "determines", "evaluates"]
+            )
             text = f"def {var}_{func}(): # This {func} {action} the {var} value."
 
-        else:  # deduction
+        elif pattern == "deduction":
             premises = random.sample(self.synthetic_word_pool, 2)
             conclusion = random.choice(self.synthetic_word_pool)
             text = f"Given {premises[0]} and {premises[1]}, we deduce {conclusion}."
+
+        elif pattern == "syscall_pattern":
+            # Generate synthetic syscall examples
+            syscalls = [
+                "read",
+                "write",
+                "open",
+                "close",
+                "mmap",
+                "fork",
+                "exec",
+                "wait",
+                "exit",
+                "ioctl",
+            ]
+            syscall = random.choice(syscalls)
+            fd = random.randint(0, 255)
+            size = random.choice([64, 128, 256, 512, 1024, 4096])
+            text = f"// System call: {syscall}(fd={fd}, buf=buffer, count={size}); // Returns bytes processed or -1 on error."
+
+        elif pattern == "driver_pattern":
+            # Generate synthetic device driver code patterns
+            devices = [
+                "pci",
+                "usb",
+                "serial",
+                "block",
+                "char",
+                "network",
+                "gpio",
+                "i2c",
+                "spi",
+            ]
+            device = random.choice(devices)
+            reg = random.randint(0x00, 0xFF)
+            text = f"// {device}_driver: initialize device at register 0x{reg:02X}, set interrupt handler, enable DMA."
+
+        elif pattern == "memory_mgmt":
+            # Generate synthetic memory management patterns
+            ops = [
+                "malloc",
+                "calloc",
+                "realloc",
+                "free",
+                "mmap",
+                "munmap",
+                "brk",
+                "sbrk",
+            ]
+            op = random.choice(ops)
+            size = random.choice([64, 256, 1024, 4096, 16384, 65536])
+            text = f"// Memory operation: {op}(size={size}); // Allocate virtual memory, update page tables, check limits."
+
+        elif pattern == "boot_sequence":
+            # Generate synthetic boot sequence steps
+            stages = [
+                "BIOS/UEFI",
+                "bootloader",
+                "kernel decompression",
+                "initrd",
+                "init",
+                "user space",
+            ]
+            stage1, stage2 = random.sample(stages, 2)
+            text = f"// Boot: {stage1} -> {stage2}: Load segments, setup stack, enable paging, jump to entry point."
+
+        elif pattern == "interrupt_handler":
+            # Generate synthetic interrupt handler patterns
+            irqs = [
+                "timer",
+                "keyboard",
+                "mouse",
+                "disk",
+                "network",
+                "DMA",
+                "system call",
+            ]
+            irq = random.choice(irqs)
+            text = f"// IRQ handler: {irq}_interrupt() {{ save context; handle event; send EOI; restore context; iret; }}"
+
+        elif pattern == "humaneval_pattern":
+            # HumanEval-style function completion patterns
+            funcs = [
+                (
+                    "def add(a: int, b: int) -> int:",
+                    '    """Add two numbers."""',
+                    "    return a + b",
+                ),
+                (
+                    "def factorial(n: int) -> int:",
+                    '    """Calculate factorial."""',
+                    "    if n <= 1: return 1; return n * factorial(n-1)",
+                ),
+                (
+                    "def is_palindrome(s: str) -> bool:",
+                    '    """Check if string is palindrome."""',
+                    "    return s == s[::-1]",
+                ),
+                (
+                    "def fibonacci(n: int) -> int:",
+                    '    """Return nth Fibonacci number."""',
+                    "    if n <= 1: return n; return fibonacci(n-1) + fibonacci(n-2)",
+                ),
+                (
+                    "def reverse_list(lst: list) -> list:",
+                    '    """Reverse a list."""',
+                    "    return lst[::-1]",
+                ),
+                (
+                    "def binary_search(arr: list, target: int) -> int:",
+                    '    """Binary search implementation."""',
+                    "    # Binary search algorithm",
+                ),
+                (
+                    "def merge_sort(arr: list) -> list:",
+                    '    """Merge sort implementation."""',
+                    "    # Merge sort algorithm",
+                ),
+                (
+                    "def quick_sort(arr: list) -> list:",
+                    '    """Quick sort implementation."""',
+                    "    # Quick sort algorithm",
+                ),
+            ]
+            header, docstring, impl = random.choice(funcs)
+            text = f"{header}\n{docstring}\n{impl}"
+
+        elif pattern == "c_function":
+            # C function implementation patterns
+            funcs = [
+                ("int add(int a, int b)", "// Add two integers", "    return a + b;"),
+                (
+                    "void swap(int *a, int *b)",
+                    "// Swap two integers",
+                    "    int temp = *a; *a = *b; *b = temp;",
+                ),
+                (
+                    "size_t strlen(const char *s)",
+                    "// Calculate string length",
+                    "    size_t len = 0; while (*s++) len++; return len;",
+                ),
+                (
+                    "void *memcpy(void *dest, const void *src, size_t n)",
+                    "// Copy memory",
+                    "    // Memory copy implementation",
+                ),
+                (
+                    "int strcmp(const char *s1, const char *s2)",
+                    "// Compare strings",
+                    "    // String compare implementation",
+                ),
+                (
+                    "void *malloc(size_t size)",
+                    "// Allocate memory",
+                    "    // Memory allocation",
+                ),
+                (
+                    "void free(void *ptr)",
+                    "// Free memory",
+                    "    // Memory deallocation",
+                ),
+            ]
+            sig, comment, impl = random.choice(funcs)
+            text = f"{sig} {{\n{comment}\n{impl}\n}}"
+
+        elif pattern == "rust_function":
+            # Rust function patterns
+            funcs = [
+                ("fn add(a: i32, b: i32) -> i32", "// Add two numbers", "    a + b"),
+                (
+                    "fn factorial(n: u64) -> u64",
+                    "// Calculate factorial",
+                    "    if n <= 1 { 1 } else { n * factorial(n-1) }",
+                ),
+                ("fn is_even(n: i32) -> bool", "// Check if even", "    n % 2 == 0"),
+                (
+                    "fn swap<T>(a: &mut T, b: &mut T)",
+                    "// Swap values",
+                    "    std::mem::swap(a, b);",
+                ),
+                (
+                    "fn binary_search(arr: &[i32], target: i32) -> Option<usize>",
+                    "// Binary search",
+                    "    // Implementation",
+                ),
+                (
+                    "impl Drop for MyType",
+                    "// Custom destructor",
+                    "    fn drop(&mut self) { /* cleanup */ }",
+                ),
+            ]
+            sig, comment, impl = random.choice(funcs)
+            text = f"{sig} {{\n{comment}\n{impl}\n}}"
+
+        elif pattern == "code_debug":
+            # Code debugging/repair patterns
+            bugs = [
+                (
+                    "def divide(a, b):\n    return a / b",
+                    "# Bug: division by zero\n    if b == 0:\n        raise ValueError('Division by zero')\n    return a / b",
+                ),
+                (
+                    "for i in range(len(lst)):\n    print(lst[i])",
+                    "# Better: iterate directly\nfor item in lst:\n    print(item)",
+                ),
+                ("if x == True:", "# Bug: boolean comparison\nif x:"),
+                (
+                    "file = open('data.txt')\ndata = file.read()",
+                    "# Bug: file not closed\nwith open('data.txt') as file:\n    data = file.read()",
+                ),
+                ("lst = []\nlst.append(1)", "# Optimization: list literal\nlst = [1]"),
+            ]
+            buggy, fixed = random.choice(bugs)
+            text = f"# Fix this code:\n{buggy}\n\n# Fixed version:\n{fixed}"
+
+        elif pattern == "api_usage":
+            # API usage examples
+            apis = [
+                (
+                    "requests",
+                    "import requests\nresponse = requests.get(url)\ndata = response.json()",
+                ),
+                (
+                    "sqlite",
+                    "import sqlite3\nconn = sqlite3.connect('db.db')\ncursor = conn.cursor()",
+                ),
+                (
+                    "threading",
+                    "import threading\nthread = threading.Thread(target=func)\nthread.start()",
+                ),
+                (
+                    "asyncio",
+                    "import asyncio\nasync def main():\n    await asyncio.sleep(1)",
+                ),
+                (
+                    "json",
+                    "import json\nwith open('data.json') as f:\n    data = json.load(f)",
+                ),
+                ("regex", "import re\nmatch = re.search(r'pattern', text)"),
+            ]
+            lib, code = random.choice(apis)
+            text = f"# Using {lib} library:\n{code}"
+
+        elif pattern == "data_structure":
+            # Data structure implementations
+            dss = [
+                (
+                    "class Stack:",
+                    "def __init__(self): self.items = []\n    def push(self, item): self.items.append(item)\n    def pop(self): return self.items.pop()",
+                ),
+                (
+                    "class Queue:",
+                    "def __init__(self): self.items = []\n    def enqueue(self, item): self.items.append(item)\n    def dequeue(self): return self.items.pop(0)",
+                ),
+                (
+                    "class Node:",
+                    "def __init__(self, val): self.val = val; self.next = None",
+                ),
+                (
+                    "class BinaryTree:",
+                    "def __init__(self, val): self.val = val; self.left = None; self.right = None",
+                ),
+                (
+                    "class LinkedList:",
+                    "def __init__(self): self.head = None\n    def append(self, val): # append logic",
+                ),
+            ]
+            header, impl = random.choice(dss)
+            text = f"{header}\n{impl}"
+
+        elif pattern == "design_pattern":
+            # Design pattern examples
+            patterns = [
+                (
+                    "# Singleton Pattern",
+                    "class Singleton:\n    _instance = None\n    def __new__(cls):\n        if cls._instance is None:\n            cls._instance = super().__new__(cls)\n        return cls._instance",
+                ),
+                (
+                    "# Factory Pattern",
+                    "class Factory:\n    @staticmethod\n    def create_product(type):\n        if type == 'A': return ProductA()\n        elif type == 'B': return ProductB()",
+                ),
+                (
+                    "# Observer Pattern",
+                    "class Subject:\n    def __init__(self): self.observers = []\n    def attach(self, observer): self.observers.append(observer)",
+                ),
+                (
+                    "# Decorator Pattern",
+                    "def decorator(func):\n    def wrapper(*args, **kwargs):\n        # pre-processing\n        result = func(*args, **kwargs)\n        # post-processing\n        return result\n    return wrapper",
+                ),
+            ]
+            name, impl = random.choice(patterns)
+            text = f"{name}\n{impl}"
+
+        elif pattern == "error_handling":
+            # Error handling patterns
+            patterns = [
+                (
+                    "try-except",
+                    "try:\n    result = risky_operation()\nexcept ValueError as e:\n    print(f'Error: {e}')\nfinally:\n    cleanup()",
+                ),
+                (
+                    "try-except-else",
+                    "try:\n    result = operation()\nexcept Exception as e:\n    handle_error(e)\nelse:\n    process_result(result)",
+                ),
+                ("raise", "if not valid_input:\n    raise ValueError('Invalid input')"),
+                ("custom exception", "class ValidationError(Exception):\n    pass"),
+            ]
+            name, code = random.choice(patterns)
+            text = f"# {name} pattern:\n{code}"
+
+        elif pattern == "concurrency":
+            # Concurrency patterns
+            patterns = [
+                (
+                    "Thread",
+                    "import threading\ndef worker(): pass\nthread = threading.Thread(target=worker)\nthread.start()\nthread.join()",
+                ),
+                (
+                    "Lock",
+                    "import threading\nlock = threading.Lock()\nwith lock:\n    # critical section\n    pass",
+                ),
+                (
+                    "Process",
+                    "from multiprocessing import Process\np = Process(target=function)\np.start()\np.join()",
+                ),
+                (
+                    "Pool",
+                    "from multiprocessing import Pool\nwith Pool(4) as p:\n    results = p.map(func, items)",
+                ),
+                (
+                    "async",
+                    "import asyncio\nasync def task():\n    await asyncio.sleep(1)\nawait task()",
+                ),
+            ]
+            name, code = random.choice(patterns)
+            text = f"# {name} concurrency:\n{code}"
 
         return text
 
@@ -597,7 +1599,11 @@ def generate_reasoning_chain_data(batch_size, seq_len):
         # Classic syllogisms
         ("all birds can fly", "penguins are birds", "penguins can fly"),
         ("all humans are mortal", "Socrates is human", "Socrates is mortal"),
-        ("all squares are rectangles", "this shape is a square", "this shape is a rectangle"),
+        (
+            "all squares are rectangles",
+            "this shape is a square",
+            "this shape is a rectangle",
+        ),
         ("A implies B", "B implies C", "A implies C"),
         # Cause and effect
         ("if it rains, the ground is wet", "it is raining", "the ground is wet"),
@@ -620,7 +1626,9 @@ def generate_reasoning_chain_data(batch_size, seq_len):
     for _ in range(batch_size):
         template = random.choice(templates)
         premise1, premise2, conclusion = random.choice(reasoning_pairs)
-        text = template.format(premise1=premise1, premise2=premise2, conclusion=conclusion)
+        text = template.format(
+            premise1=premise1, premise2=premise2, conclusion=conclusion
+        )
         prompts.append(text)
 
     encoded = tokenizer(
@@ -661,13 +1669,17 @@ def load_language_datasets(config):
             if len(dataset) > max_samples:
                 dataset = dataset.shuffle(seed=42).select(range(max_samples))
 
-            loaded.append({
-                "id": dataset_id,
-                "dataset": dataset,
-                "text_field": spec.get("text_field", "text"),
-                "weight": spec.get("weight", 1.0),
-            })
-            print(f"Loaded dataset: {dataset_id} ({len(dataset)} rows, weight={spec.get('weight', 1.0)})")
+            loaded.append(
+                {
+                    "id": dataset_id,
+                    "dataset": dataset,
+                    "text_field": spec.get("text_field", "text"),
+                    "weight": spec.get("weight", 1.0),
+                }
+            )
+            print(
+                f"Loaded dataset: {dataset_id} ({len(dataset)} rows, weight={spec.get('weight', 1.0)})"
+            )
 
         except Exception as exc:
             print(f"Could not load {dataset_id}: {exc}")
@@ -695,17 +1707,15 @@ def get_amp_settings(config):
     return use_amp, amp_dtype, scaler
 
 
-def create_optimizer_and_scheduler(model, config, lr_scale, total_steps, warmup_steps=None):
+def create_optimizer_and_scheduler(
+    model, config, lr_scale, total_steps, warmup_steps=None
+):
     """Create optimizer and learning rate scheduler."""
     max_lr = config["learning_rate"] * config["aggressive_lr_multiplier"] * lr_scale
     min_lr = config.get("min_learning_rate", 1e-6)
 
     optimizer = torch.optim.AdamW(
-        model.parameters(),
-        lr=max_lr,
-        betas=(0.9, 0.95),
-        weight_decay=0.01,
-        eps=1e-8
+        model.parameters(), lr=max_lr, betas=(0.9, 0.95), weight_decay=0.01, eps=1e-8
     )
 
     if warmup_steps is None:
@@ -714,7 +1724,9 @@ def create_optimizer_and_scheduler(model, config, lr_scale, total_steps, warmup_
     def lr_lambda(current_step):
         if current_step < warmup_steps:
             return float(current_step) / float(max(1, warmup_steps))
-        progress = float(current_step - warmup_steps) / float(max(1, total_steps - warmup_steps))
+        progress = float(current_step - warmup_steps) / float(
+            max(1, total_steps - warmup_steps)
+        )
         cosine_decay = 0.5 * (1.0 + math.cos(math.pi * progress))
         return max(min_lr / max_lr, cosine_decay)
 
@@ -749,7 +1761,7 @@ def evaluate_model(model, data_loader, criterion, config, num_batches=10):
     model.train()
 
     avg_loss = total_loss / max(total_tokens, 1)
-    perplexity = math.exp(avg_loss) if avg_loss < 10 else float('inf')
+    perplexity = math.exp(avg_loss) if avg_loss < 10 else float("inf")
 
     return avg_loss, perplexity
 
@@ -779,7 +1791,7 @@ def run_training_phase(
     completed_steps = 0
 
     # Tracking
-    best_loss = float('inf')
+    best_loss = float("inf")
     patience_counter = 0
     losses = []
 
@@ -835,11 +1847,15 @@ def run_training_phase(
                 f"{phase_name} | Step {completed_steps}/{total_steps} "
                 f"Loss: {avg_loss:.4f} LR: {lr:.2e} "
                 f"Iter: {iterations} "
-                f"Speed: {steps_per_sec:.1f} steps/s ETA: {eta/60:.1f}min"
+                f"Speed: {steps_per_sec:.1f} steps/s ETA: {eta / 60:.1f}min"
             )
 
         # Validation
-        if validation_generator and step % config.get("eval_every", 100) == 0 and step > 0:
+        if (
+            validation_generator
+            and step % config.get("eval_every", 100) == 0
+            and step > 0
+        ):
             val_loss, perplexity = evaluate_model(
                 model, validation_generator, criterion, config, num_batches=5
             )
@@ -850,13 +1866,18 @@ def run_training_phase(
                 best_loss = val_loss
                 patience_counter = 0
                 # Save best checkpoint
-                best_path = os.path.join(config["checkpoint_dir"], f"{checkpoint_name}_best.pt")
-                torch.save({
-                    "model_state_dict": model.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                    "step": step,
-                    "loss": val_loss,
-                }, best_path)
+                best_path = os.path.join(
+                    config["checkpoint_dir"], f"{checkpoint_name}_best.pt"
+                )
+                torch.save(
+                    {
+                        "model_state_dict": model.state_dict(),
+                        "optimizer_state_dict": optimizer.state_dict(),
+                        "step": step,
+                        "loss": val_loss,
+                    },
+                    best_path,
+                )
             else:
                 patience_counter += 1
                 if patience_counter >= config.get("patience", 5):
@@ -873,29 +1894,35 @@ def run_training_phase(
             checkpoint_path = os.path.join(
                 config["checkpoint_dir"], f"{checkpoint_name}_step_{step + 1}.pt"
             )
-            torch.save({
-                "model_state_dict": model.state_dict(),
-                "optimizer_state_dict": optimizer.state_dict(),
-                "scheduler_state_dict": scheduler.state_dict(),
-                "step": step + 1,
-                "loss": loss.item() * grad_accum_steps,
-            }, checkpoint_path)
+            torch.save(
+                {
+                    "model_state_dict": model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "scheduler_state_dict": scheduler.state_dict(),
+                    "step": step + 1,
+                    "loss": loss.item() * grad_accum_steps,
+                },
+                checkpoint_path,
+            )
             print(f"Checkpoint saved: {checkpoint_path}")
 
     total_time = time.time() - start_time
     print(
-        f"{phase_name} completed in {total_time/60:.1f} minutes "
+        f"{phase_name} completed in {total_time / 60:.1f} minutes "
         f"({completed_steps} steps)."
     )
 
     # Save phase checkpoint
     checkpoint_path = os.path.join(config["checkpoint_dir"], f"{checkpoint_name}.pt")
-    torch.save({
-        "model_state_dict": model.state_dict(),
-        "optimizer_state_dict": optimizer.state_dict(),
-        "scheduler_state_dict": scheduler.state_dict(),
-        "config": config,
-    }, checkpoint_path)
+    torch.save(
+        {
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "scheduler_state_dict": scheduler.state_dict(),
+            "config": config,
+        },
+        checkpoint_path,
+    )
     print(f"{phase_name} checkpoint saved: {checkpoint_path}")
 
     return model
@@ -903,9 +1930,9 @@ def run_training_phase(
 
 def train_phase_1(model, config, language_datasets):
     """Phase 1: Language Pretraining."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("Phase 1: Language Pretraining (Rich Datasets)")
-    print("="*60)
+    print("=" * 60)
 
     train_loader = ImprovedDataLoader(
         language_datasets, config["batch_size"], config["seq_len"], config
@@ -919,15 +1946,21 @@ def train_phase_1(model, config, language_datasets):
             val_size = int(len(ds["dataset"]) * config["validation_split"])
             if val_size > 100:
                 val_data = ds["dataset"].shuffle(seed=42).select(range(val_size))
-                val_datasets.append({
-                    "id": ds["id"] + "_val",
-                    "dataset": val_data,
-                    "text_field": ds["text_field"],
-                    "weight": ds["weight"],
-                })
+                val_datasets.append(
+                    {
+                        "id": ds["id"] + "_val",
+                        "dataset": val_data,
+                        "text_field": ds["text_field"],
+                        "weight": ds["weight"],
+                    }
+                )
         if val_datasets:
             val_loader = ImprovedDataLoader(
-                val_datasets, config["batch_size"], config["seq_len"], config, is_validation=True
+                val_datasets,
+                config["batch_size"],
+                config["seq_len"],
+                config,
+                is_validation=True,
             )
 
     return run_training_phase(
@@ -945,9 +1978,9 @@ def train_phase_1(model, config, language_datasets):
 
 def train_phase_2(model, config):
     """Phase 2: Algorithmic Curriculum."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("Phase 2: Algorithmic Curriculum")
-    print("="*60)
+    print("=" * 60)
 
     step_counter = [0]
     total_steps = config["phase2_steps"]
@@ -979,9 +2012,9 @@ def train_phase_2(model, config):
 
 def train_phase_3(model, config, language_datasets):
     """Phase 3: Reasoning Distillation from GPT-2."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("Phase 3: Reasoning Distillation")
-    print("="*60)
+    print("=" * 60)
 
     teacher = None
     try:
@@ -1027,8 +2060,7 @@ def train_phase_3(model, config, language_datasets):
 
             # Standard cross-entropy loss
             ce_loss = criterion(
-                student_logits.view(-1, config["vocab_size"]),
-                labels.view(-1)
+                student_logits.view(-1, config["vocab_size"]), labels.view(-1)
             )
 
             # Distillation loss from teacher
@@ -1044,8 +2076,8 @@ def train_phase_3(model, config, language_datasets):
                 teacher_probs = F.softmax(teacher_logits / temperature, dim=-1)
                 distill_loss = kl_loss(
                     student_probs.view(-1, config["vocab_size"]),
-                    teacher_probs.view(-1, config["vocab_size"])
-                ) * (temperature ** 2)
+                    teacher_probs.view(-1, config["vocab_size"]),
+                ) * (temperature**2)
 
             # Combined loss
             alpha = 0.7  # Weight for standard loss
@@ -1071,7 +2103,7 @@ def train_phase_3(model, config, language_datasets):
         if step % config["log_every"] == 0:
             lr = scheduler.get_last_lr()[0]
             print(
-                f"Phase 3 | Step {step+1}/{config['phase3_steps']} "
+                f"Phase 3 | Step {step + 1}/{config['phase3_steps']} "
                 f"CE: {ce_loss.item():.4f} Dist: {distill_loss.item():.4f} "
                 f"LR: {lr:.2e}"
             )
@@ -1082,7 +2114,7 @@ def train_phase_3(model, config, language_datasets):
             )
             torch.save(model.state_dict(), checkpoint_path)
 
-    print(f"Phase 3 completed in {(time.time() - start_time)/60:.1f} minutes")
+    print(f"Phase 3 completed in {(time.time() - start_time) / 60:.1f} minutes")
 
     checkpoint_path = os.path.join(config["checkpoint_dir"], "phase_3.pt")
     torch.save(model.state_dict(), checkpoint_path)
@@ -1092,9 +2124,9 @@ def train_phase_3(model, config, language_datasets):
 
 def train_phase_4(model, config, language_datasets):
     """Phase 4: Self-Consistency Training."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("Phase 4: Self-Consistency Training")
-    print("="*60)
+    print("=" * 60)
 
     train_loader = ImprovedDataLoader(
         language_datasets, config["batch_size"], config["seq_len"], config
@@ -1192,10 +2224,13 @@ def main():
 
     # Save final model
     final_path = os.path.join(TRAINING_CONFIG["checkpoint_dir"], "final_model.pt")
-    torch.save({
-        "model_state_dict": model.state_dict(),
-        "config": TRAINING_CONFIG,
-    }, final_path)
+    torch.save(
+        {
+            "model_state_dict": model.state_dict(),
+            "config": TRAINING_CONFIG,
+        },
+        final_path,
+    )
     print(f"\nFinal model saved to: {final_path}")
 
     # Also save as idir_model.pt for compatibility
