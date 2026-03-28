@@ -834,7 +834,7 @@ TRAINING_CONFIG = {
     "phase2_steps": TOTAL_STEPS_PHASE2,
     "phase3_steps": TOTAL_STEPS_PHASE3,
     "phase4_steps": TOTAL_STEPS_PHASE4,
-    "save_every": 150,  # Less frequent saves for speed
+    "save_every": 500,  # Less frequent saves for speed (reduced storage)
     "log_every": 75,
     "eval_every": 150,
     "max_grad_norm": 1.0,
@@ -1499,6 +1499,26 @@ class ImprovedDataLoader:
         return self.stats.copy()
 
 
+def cleanup_old_checkpoints(checkpoint_dir, keep_last_n=3):
+    """Remove old checkpoints to save disk space, keeping only the most recent ones."""
+    import glob
+    import os
+
+    try:
+        checkpoints = glob.glob(os.path.join(checkpoint_dir, "*.pt"))
+        # Sort by modification time (oldest first)
+        checkpoints.sort(key=os.path.getmtime)
+        # Remove old checkpoints, keeping only the last N
+        for old_checkpoint in checkpoints[:-keep_last_n]:
+            try:
+                os.remove(old_checkpoint)
+                print(f"Removed old checkpoint: {old_checkpoint}")
+            except OSError as e:
+                print(f"Warning: Could not remove {old_checkpoint}: {e}")
+    except Exception as e:
+        print(f"Warning: Error during checkpoint cleanup: {e}")
+
+
 def generate_arithmetic_data(batch_size, seq_len, difficulty="mixed"):
     """Generate synthetic arithmetic examples with varying difficulty and formats."""
     prompts = []
@@ -1665,7 +1685,9 @@ def load_language_datasets(config):
             )
 
             # Limit dataset size for memory efficiency
-            max_samples = min(len(dataset), 500000)  # Cap at 500k samples
+            max_samples = min(
+                len(dataset), 200000
+            )  # Cap at 200k samples to save storage
             if len(dataset) > max_samples:
                 dataset = dataset.shuffle(seed=42).select(range(max_samples))
 
@@ -1870,62 +1892,66 @@ def run_training_phase(
                     config["checkpoint_dir"], f"{checkpoint_name}_best.pt"
                 )
                 torch.save(
-                    {
-                        "model_state_dict": model.state_dict(),
-                        "optimizer_state_dict": optimizer.state_dict(),
-                        "step": step,
-                        "loss": val_loss,
-                    },
-                    best_path,
-                )
-            else:
-                patience_counter += 1
-                if patience_counter >= config.get("patience", 5):
-                    print(f"Early stopping triggered at step {step}")
-                    break
+                     {
+                         "model_state_dict": model.state_dict(),
+                         "optimizer_state_dict": optimizer.state_dict(),
+                         "step": step,
+                         "loss": val_loss,
+                     },
+                     best_path,
+                 )
+             else:
+                 patience_counter += 1
+                 if patience_counter >= config.get("patience", 5):
+                     print(f"Early stopping triggered at step {step}")
+                     break
 
-        # Time budget check
-        if time_budget and elapsed >= time_budget:
-            print(f"{phase_name} reached time budget after {completed_steps} steps.")
-            break
+         # Time budget check
+         if time_budget and elapsed >= time_budget:
+             print(f"{phase_name} reached time budget after {completed_steps} steps.")
+             break
 
-        # Checkpoint saving
-        if (step + 1) % config["save_every"] == 0:
-            checkpoint_path = os.path.join(
-                config["checkpoint_dir"], f"{checkpoint_name}_step_{step + 1}.pt"
-            )
-            torch.save(
-                {
-                    "model_state_dict": model.state_dict(),
-                    "optimizer_state_dict": optimizer.state_dict(),
-                    "scheduler_state_dict": scheduler.state_dict(),
-                    "step": step + 1,
-                    "loss": loss.item() * grad_accum_steps,
-                },
-                checkpoint_path,
-            )
-            print(f"Checkpoint saved: {checkpoint_path}")
+         # Checkpoint saving
+         if (step + 1) % config["save_every"] == 0:
+             checkpoint_path = os.path.join(
+                 config["checkpoint_dir"], f"{checkpoint_name}_step_{step + 1}.pt"
+             )
+             torch.save(
+                 {
+                     "model_state_dict": model.state_dict(),
+                     "optimizer_state_dict": optimizer.state_dict(),
+                     "scheduler_state_dict": scheduler.state_dict(),
+                     "step": step + 1,
+                     "loss": loss.item() * grad_accum_steps,
+                 },
+                 checkpoint_path,
+             )
+             print(f"Checkpoint saved: {checkpoint_path}")
+             # Cleanup old checkpoints to save space
+             cleanup_old_checkpoints(config["checkpoint_dir"], keep_last_n=3)
 
-    total_time = time.time() - start_time
-    print(
-        f"{phase_name} completed in {total_time / 60:.1f} minutes "
-        f"({completed_steps} steps)."
-    )
+     total_time = time.time() - start_time
+     print(
+         f"{phase_name} completed in {total_time / 60:.1f} minutes "
+         f"({completed_steps} steps)."
+     )
 
-    # Save phase checkpoint
-    checkpoint_path = os.path.join(config["checkpoint_dir"], f"{checkpoint_name}.pt")
-    torch.save(
-        {
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "scheduler_state_dict": scheduler.state_dict(),
-            "config": config,
-        },
-        checkpoint_path,
-    )
-    print(f"{phase_name} checkpoint saved: {checkpoint_path}")
+     # Save phase checkpoint
+     checkpoint_path = os.path.join(config["checkpoint_dir"], f"{checkpoint_name}.pt")
+     torch.save(
+         {
+             "model_state_dict": model.state_dict(),
+             "optimizer_state_dict": optimizer.state_dict(),
+             "scheduler_state_dict": scheduler.state_dict(),
+             "config": config,
+         },
+         checkpoint_path,
+     )
+     print(f"{phase_name} checkpoint saved: {checkpoint_path}")
+     # Cleanup old checkpoints to save space (keep phase checkpoint + recent ones)
+     cleanup_old_checkpoints(config["checkpoint_dir"], keep_last_n=5)
 
-    return model
+     return model
 
 
 def train_phase_1(model, config, language_datasets):
