@@ -11,6 +11,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from datasets import DatasetNotFoundError, load_dataset
 from idir_model import IDIR
+from local_datasets import get_local_dataset_iterable
 
 try:
     from transformers import GPT2LMHeadModel, GPT2Tokenizer
@@ -1523,6 +1524,7 @@ def load_language_datasets(config):
             dataset_id = f"{dataset_id}/{spec['name']}"
 
         dataset_iterable = None
+        fallback_reason = None
         try:
             dataset_iterable = load_dataset(
                 spec["path"],
@@ -1531,22 +1533,40 @@ def load_language_datasets(config):
                 streaming=True,
             )
         except DatasetNotFoundError as exc:
-            print(f"{dataset_id} not found ({exc}); skipping.")
-            continue
+            fallback_reason = f"DatasetNotFoundError ({exc})"
         except RuntimeError as exc:
             message = str(exc)
             if "Dataset scripts are no longer supported" in message:
+                fallback_reason = message
+            else:
                 print(
-                    f"{dataset_id} requires dataset script ({message}); skipping ungated pool."
+                    f"Streaming dataset failed for {dataset_id}: {message}. "
+                    "Trying eager fallback."
+                )
+                try:
+                    dataset_iterable = load_dataset(
+                        spec["path"],
+                        spec.get("name"),
+                        split=spec.get("split", "train"),
+                        streaming=False,
+                    )
+                except Exception as eager_exc:
+                    fallback_reason = f"Eager fallback failed ({eager_exc})"
+
+        if dataset_iterable is None:
+            dataset_iterable = get_local_dataset_iterable(spec)
+            if dataset_iterable:
+                print(
+                    f"Using local fallback for {dataset_id}. "
+                    f"Reason: {fallback_reason or 'remote failure'}"
+                )
+            else:
+                print(
+                    f"Skipping {dataset_id}; "
+                    f"{fallback_reason or 'no local fallback available'}."
                 )
                 continue
-            print(f"Streaming failed for {dataset_id} ({message}); falling back to eager iterator.")
-            dataset_iterable = load_dataset(
-                spec["path"],
-                spec.get("name"),
-                split=spec.get("split", "train"),
-                streaming=False,
-            )
+
         sampler = StreamingDatasetSampler(dataset_iterable, buffer_size=buffer_size)
         loaded.append(
             {
