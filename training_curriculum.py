@@ -9,7 +9,7 @@ from typing import Optional, List, Dict, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from datasets import DatasetNotFoundError, load_dataset
+from datasets import load_dataset
 from idir_model import IDIR
 from local_datasets import get_local_dataset_iterable
 
@@ -1532,12 +1532,14 @@ def load_language_datasets(config):
                 split=spec.get("split", "train"),
                 streaming=True,
             )
-        except DatasetNotFoundError as exc:
-            fallback_reason = f"DatasetNotFoundError ({exc})"
-        except RuntimeError as exc:
+        except Exception as exc:
             message = str(exc)
+            fallback_reason = message
             if "Dataset scripts are no longer supported" in message:
-                fallback_reason = message
+                print(
+                    f"{dataset_id} requires dataset script ({message}); "
+                    "switching to local fallback."
+                )
             else:
                 print(
                     f"Streaming dataset failed for {dataset_id}: {message}. "
@@ -1551,7 +1553,7 @@ def load_language_datasets(config):
                         streaming=False,
                     )
                 except Exception as eager_exc:
-                    fallback_reason = f"Eager fallback failed ({eager_exc})"
+                    fallback_reason = f"{message} (eager fallback failed: {eager_exc})"
 
         if dataset_iterable is None:
             dataset_iterable = get_local_dataset_iterable(spec)
