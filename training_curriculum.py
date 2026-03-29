@@ -9,8 +9,7 @@ from typing import Optional, List, Dict, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import IterableDataset
-from datasets import load_dataset, Dataset
+from datasets import load_dataset
 from idir_model import IDIR
 
 try:
@@ -100,7 +99,27 @@ VRAM_CONFIGS = {
     },
 }
 
-vram_cfg = VRAM_CONFIGS[VRAM_MODE]
+base_vram_cfg = VRAM_CONFIGS[VRAM_MODE]
+
+SAFE_BATCH_SIZES = {
+    "high_end": 8,
+    "16gb": 8,
+    "rtx_3050_8gb": 8,
+    "rtx_3050_4gb": 4,
+    "low": 4,
+}
+
+safe_limit = SAFE_BATCH_SIZES.get(VRAM_MODE, 8)
+clamped_batch_size = min(base_vram_cfg["batch_size"], safe_limit)
+if clamped_batch_size != base_vram_cfg["batch_size"]:
+    print(
+        f"Clamping batch_size "
+        f"{base_vram_cfg['batch_size']} -> {clamped_batch_size} "
+        f"for VRAM mode '{VRAM_MODE}'"
+    )
+
+vram_cfg = dict(base_vram_cfg)
+vram_cfg["batch_size"] = clamped_batch_size
 
 # Training time configuration - Aggressive optimization for < 1 hour on RTX 3050 6GB
 TARGET_TRAINING_TIME_HOURS = 0.90  # Target 54 minutes to allow for overhead
@@ -844,6 +863,7 @@ TRAINING_CONFIG = {
     "compile_model": vram_cfg["compile_model"],
     "gradient_accumulation_steps": vram_cfg.get("gradient_accumulation_steps", 1),
     "checkpoint_dir": "checkpoints",
+    "stream_buffer_size": 256,  # Keep a small replay buffer when streaming datasets
     "num_workers": 0,  # Use main process for data loading (more stable)
     "prefetch_factor": 4,  # Balanced for RTX 3050
     "phase_time_budgets": PHASE_TIME_BUDGETS,
@@ -853,6 +873,8 @@ TRAINING_CONFIG = {
     "language_datasets": LANGUAGE_DATASETS_CONFIG,
     "use_weighted_sampling": True,
     "validation_split": 0.003,  # Minimal validation
+
+    "validation_batches": 5,
     "patience": 5,  # More patience for better convergence
     "min_delta": 0.0005,  # Tighter convergence threshold
     "code_focus": True,  # Enable code-specific optimizations
@@ -860,6 +882,41 @@ TRAINING_CONFIG = {
 }
 
 os.makedirs(TRAINING_CONFIG["checkpoint_dir"], exist_ok=True)
+
+
+class StreamingDatasetSampler:
+    """Lazy sampler that keeps a small buffer from a streaming dataset."""
+
+    def __init__(self, dataset_iterable, buffer_size=256):
+        self.dataset_iterable = dataset_iterable
+        self.buffer_size = max(8, buffer_size)
+        self.iterator = iter(self.dataset_iterable)
+        self.buffer = []
+
+    def _refill(self):
+        attempts = 0
+        while len(self.buffer) < self.buffer_size and attempts < self.buffer_size * 4:
+            try:
+                item = next(self.iterator)
+            except StopIteration:
+                try:
+                    self.iterator = iter(self.dataset_iterable)
+                except Exception:
+                    break
+                attempts += 1
+                continue
+            self.buffer.append(item)
+            attempts += 1
+
+    def sample(self):
+        """Return a random example from the buffer, refilling if needed."""
+        if not self.buffer:
+            self._refill()
+        if not self.buffer:
+            raise RuntimeError("Could not sample from dataset buffer.")
+        if len(self.buffer) < self.buffer_size:
+            self._refill()
+        return random.choice(self.buffer)
 
 
 class ImprovedDataLoader:
@@ -957,12 +1014,16 @@ class ImprovedDataLoader:
         for _ in range(max_attempts):
             idx = self._sample_dataset_index()
             source = self.datasets[idx]
-            dataset = source["dataset"]
+            sampler = source.get("sampler")
             text_field = source["text_field"]
 
             try:
-                row_idx = random.randint(0, len(dataset) - 1)
-                sample = dataset[row_idx]
+                if sampler is not None:
+                    sample = sampler.sample()
+                else:
+                    dataset = source["dataset"]
+                    row_idx = random.randint(0, len(dataset) - 1)
+                    sample = dataset[row_idx]
                 text = self._extract_text(sample, text_field)
                 if text:
                     self.stats["dataset_batches"][idx] += 1
@@ -1668,8 +1729,9 @@ def generate_reasoning_chain_data(batch_size, seq_len):
 
 
 def load_language_datasets(config):
-    """Load and prepare language datasets with error handling."""
+    """Load and prepare language datasets with streaming-friendly samplers."""
     loaded = []
+    buffer_size = config.get("stream_buffer_size", 256)
 
     for spec in config["language_datasets"]:
         dataset_id = spec["path"]
@@ -1677,34 +1739,45 @@ def load_language_datasets(config):
             dataset_id = f"{dataset_id}/{spec['name']}"
 
         try:
+            dataset_stream = load_dataset(
+                spec["path"],
+                spec.get("name"),
+                split=spec.get("split", "train"),
+                streaming=True,
+            )
+            sampler = StreamingDatasetSampler(dataset_stream, buffer_size=buffer_size)
+            loaded.append(
+                {
+                    "id": dataset_id,
+                    "sampler": sampler,
+                    "text_field": spec.get("text_field", "text"),
+                    "weight": spec.get("weight", 1.0),
+                }
+            )
+            print(
+                f"Streaming dataset ready: {dataset_id} "
+                f"(buffer={buffer_size}, weight={spec.get('weight', 1.0)})"
+            )
+
+        except Exception as exc:
+            print(
+                f"Streaming unavailable for {dataset_id}: {exc}. Falling back to eager iterator."
+            )
             dataset = load_dataset(
                 spec["path"],
                 spec.get("name"),
                 split=spec.get("split", "train"),
                 streaming=False,
             )
-
-            # Limit dataset size for memory efficiency
-            max_samples = min(
-                len(dataset), 200000
-            )  # Cap at 200k samples to save storage
-            if len(dataset) > max_samples:
-                dataset = dataset.shuffle(seed=42).select(range(max_samples))
-
+            sampler = StreamingDatasetSampler(dataset, buffer_size=buffer_size)
             loaded.append(
                 {
                     "id": dataset_id,
-                    "dataset": dataset,
+                    "sampler": sampler,
                     "text_field": spec.get("text_field", "text"),
                     "weight": spec.get("weight", 1.0),
                 }
             )
-            print(
-                f"Loaded dataset: {dataset_id} ({len(dataset)} rows, weight={spec.get('weight', 1.0)})"
-            )
-
-        except Exception as exc:
-            print(f"Could not load {dataset_id}: {exc}")
 
     if not loaded:
         print("WARNING: No datasets loaded. Using synthetic data only.")
@@ -1871,6 +1944,11 @@ def run_training_phase(
                 f"Iter: {iterations} "
                 f"Speed: {steps_per_sec:.1f} steps/s ETA: {eta / 60:.1f}min"
             )
+            if torch.cuda.is_available():
+                print(
+                    f"  VRAM usage: "
+                    f"{torch.cuda.memory_allocated() / 1024**3:.2f} GB used"
+                )
 
         # Validation
         if (
@@ -1879,7 +1957,11 @@ def run_training_phase(
             and step > 0
         ):
             val_loss, perplexity = evaluate_model(
-                model, validation_generator, criterion, config, num_batches=5
+                model,
+                validation_generator,
+                criterion,
+                config,
+                num_batches=config.get("validation_batches", 5),
             )
             print(f"  Validation - Loss: {val_loss:.4f}, Perplexity: {perplexity:.2f}")
 
@@ -1930,6 +2012,9 @@ def run_training_phase(
             # Cleanup old checkpoints to save space
             cleanup_old_checkpoints(config["checkpoint_dir"], keep_last_n=3)
 
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
     total_time = time.time() - start_time
     print(
         f"{phase_name} completed in {total_time / 60:.1f} minutes "
@@ -1966,28 +2051,13 @@ def train_phase_1(model, config, language_datasets):
 
     val_loader = None
     if language_datasets and config.get("validation_split", 0) > 0:
-        # Create validation split
-        val_datasets = []
-        for ds in language_datasets:
-            val_size = int(len(ds["dataset"]) * config["validation_split"])
-            if val_size > 100:
-                val_data = ds["dataset"].shuffle(seed=42).select(range(val_size))
-                val_datasets.append(
-                    {
-                        "id": ds["id"] + "_val",
-                        "dataset": val_data,
-                        "text_field": ds["text_field"],
-                        "weight": ds["weight"],
-                    }
-                )
-        if val_datasets:
-            val_loader = ImprovedDataLoader(
-                val_datasets,
-                config["batch_size"],
-                config["seq_len"],
-                config,
-                is_validation=True,
-            )
+        val_loader = ImprovedDataLoader(
+            language_datasets,
+            config["batch_size"],
+            config["seq_len"],
+            config,
+            is_validation=True,
+        )
 
     return run_training_phase(
         model=model,
@@ -2133,12 +2203,20 @@ def train_phase_3(model, config, language_datasets):
                 f"CE: {ce_loss.item():.4f} Dist: {distill_loss.item():.4f} "
                 f"LR: {lr:.2e}"
             )
+            if torch.cuda.is_available():
+                print(
+                    f"  VRAM usage: "
+                    f"{torch.cuda.memory_allocated() / 1024**3:.2f} GB used"
+                )
 
         if (step + 1) % config["save_every"] == 0:
             checkpoint_path = os.path.join(
                 config["checkpoint_dir"], f"phase_3_step_{step + 1}.pt"
             )
             torch.save(model.state_dict(), checkpoint_path)
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
     print(f"Phase 3 completed in {(time.time() - start_time) / 60:.1f} minutes")
 
