@@ -122,12 +122,12 @@ if clamped_batch_size != base_vram_cfg["batch_size"]:
 vram_cfg = dict(base_vram_cfg)
 vram_cfg["batch_size"] = clamped_batch_size
 
-# Training time configuration - Aggressive optimization for < 1 hour on RTX 3050 6GB
-TARGET_TRAINING_TIME_HOURS = 0.90  # Target 54 minutes to allow for overhead
-TOTAL_STEPS_PHASE1 = 600  # Language pretraining - heavy code focus (reduced for time)
-TOTAL_STEPS_PHASE2 = 300  # Algorithmic reasoning (reduced for time)
-TOTAL_STEPS_PHASE3 = 400  # Distillation from code teacher (reduced for time)
-TOTAL_STEPS_PHASE4 = 200  # Self-consistency on code (reduced for time)
+# Training time configuration - Aggressive optimization for < 30 minutes on RTX 3050 6GB
+TARGET_TRAINING_TIME_HOURS = 0.45  # ~27 minutes including data download/streaming
+TOTAL_STEPS_PHASE1 = 320  # Language pretraining with aggressive pruning
+TOTAL_STEPS_PHASE2 = 160  # Algorithmic reasoning (shortened)
+TOTAL_STEPS_PHASE3 = 220  # Distillation from code teacher
+TOTAL_STEPS_PHASE4 = 120  # Self-consistency on code
 
 # Phase rebalancing: More time on code-heavy phases
 PHASE_TIME_ALLOCATION = {
@@ -144,13 +144,17 @@ PHASE_TIME_BUDGETS = {
 # Extended high-quality dataset configuration - all ungated public datasets
 # Focused on coding, math, and reasoning content.
 LANGUAGE_DATASETS_CONFIG = [
-    {"path": "gsm8k", "split": "train", "text_field": "question", "weight": 0.08},
-    {"path": "gsm8k", "split": "train", "text_field": "answer", "weight": 0.08},
-    {"path": "math_dataset", "name": "main", "split": "train", "text_field": "question", "weight": 0.07},
-    {"path": "math_dataset", "name": "main", "split": "train", "text_field": "solution", "weight": 0.07},
-    {"path": "openwebtext", "split": "train", "text_field": "text", "weight": 0.10},
-    {"path": "wikitext", "name": "wikitext-103-raw-v1", "split": "train", "text_field": "text", "weight": 0.06},
-    {"path": "allenai/c4", "name": "en", "split": "train", "text_field": "text", "weight": 0.05},
+    {"path": "gsm8k", "split": "train", "text_field": "question", "weight": 0.06},
+    {"path": "gsm8k", "split": "train", "text_field": "answer", "weight": 0.06},
+    {"path": "math_dataset", "name": "main", "split": "train", "text_field": "question", "weight": 0.05},
+    {"path": "math_dataset", "name": "main", "split": "train", "text_field": "solution", "weight": 0.05},
+    {"path": "openwebtext", "split": "train", "text_field": "text", "weight": 0.08},
+    {"path": "wikitext", "name": "wikitext-103-raw-v1", "split": "train", "text_field": "text", "weight": 0.05},
+    {"path": "allenai/c4", "name": "en", "split": "train", "text_field": "text", "weight": 0.06},
+    {"path": "bookcorpusopen", "split": "train", "text_field": "text", "weight": 0.04},
+    {"path": "wikipedia", "name": "20220301.en", "split": "train", "text_field": "text", "weight": 0.04},
+    {"path": "stackexchange", "name": "stackoverflow", "split": "train", "text_field": "text", "weight": 0.03},
+    {"path": "imdb", "split": "train", "text_field": "text", "weight": 0.03},
 ]
 
 
@@ -1589,6 +1593,14 @@ def load_language_datasets(config):
     return loaded
 
 
+def clear_cuda_space():
+    """Ensure CUDA memory is released and peak stats reset."""
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        if hasattr(torch.cuda, "reset_peak_memory_stats"):
+            torch.cuda.reset_peak_memory_stats()
+
+
 def get_amp_settings(config):
     """Get automatic mixed precision settings."""
     use_amp = config["use_mixed_precision"] and device.type == "cuda"
@@ -1658,6 +1670,7 @@ def evaluate_model(model, data_loader, criterion, config, num_batches=10):
             total_tokens += valid_tokens
 
     model.train()
+    clear_cuda_space()
 
     avg_loss = total_loss / max(total_tokens, 1)
     perplexity = math.exp(avg_loss) if avg_loss < 10 else float("inf")
@@ -1839,6 +1852,7 @@ def run_training_phase(
     print(f"{phase_name} checkpoint saved: {checkpoint_path}")
     # Cleanup old checkpoints to save space (keep phase checkpoint + recent ones)
     cleanup_old_checkpoints(config["checkpoint_dir"], keep_last_n=5)
+    clear_cuda_space()
 
     return model
 
@@ -2080,6 +2094,7 @@ def main():
     print(f"VRAM config: {VRAM_MODE}")
     print(f"Training for {TARGET_TRAINING_TIME_HOURS} hours")
     print("-" * 60)
+    clear_cuda_space()
 
     # Create model
     model = IDIR(
@@ -2126,8 +2141,11 @@ def main():
         model = train_phase_4(model, TRAINING_CONFIG, language_datasets)
     except KeyboardInterrupt:
         print("\nTraining interrupted by user")
+        clear_cuda_space()
+        return
     except Exception as e:
         print(f"\nError during training: {e}")
+        clear_cuda_space()
         raise
 
     # Save final model
@@ -2146,6 +2164,7 @@ def main():
     print(f"Model also saved to: idir_model.pt")
 
     print("\nTraining complete!")
+    clear_cuda_space()
 
 
 if __name__ == "__main__":

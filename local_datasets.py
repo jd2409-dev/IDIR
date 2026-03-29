@@ -47,6 +47,10 @@ FALLBACK_SAMPLES = {
     "openwebtext": GENERAL_TEXT,
     "wikitext:wikitext-103-raw-v1": GENERAL_TEXT,
     "allenai/c4": GENERAL_TEXT,
+    "bookcorpusopen": GENERAL_TEXT,
+    "wikipedia:20220301.en": GENERAL_TEXT,
+    "stackexchange:stackoverflow": GENERAL_TEXT,
+    "imdb": GENERAL_TEXT,
 }
 
 
