@@ -140,231 +140,22 @@ PHASE_TIME_BUDGETS = {
     for phase, ratio in PHASE_TIME_ALLOCATION.items()
 }
 
-# Extended high-quality dataset configuration - ALL PUBLIC, NON-GATED DATASETS
-# Optimized for elite coding capability - heavily weighted toward code datasets
-# Target: Claude Opus / GPT-5 level coding performance
+# Extended high-quality dataset configuration - all ungated public datasets
+# Focused on coding, math, and reasoning content.
 LANGUAGE_DATASETS_CONFIG = [
-    # ========== PRIMARY CODE DATASETS (80% total weight) ==========
-    # The Stack v2 - Massive code corpus (50% total)
-    {
-        "path": "bigcode/the-stack-v2",
-        "name": "C",
-        "split": "train",
-        "text_field": "content",
-        "weight": 0.13,
-    },
-    {
-        "path": "bigcode/the-stack-v2",
-        "name": "C-Plus-Plus",
-        "split": "train",
-        "text_field": "content",
-        "weight": 0.12,
-    },
-    {
-        "path": "bigcode/the-stack-v2",
-        "name": "Python",
-        "split": "train",
-        "text_field": "content",
-        "weight": 0.12,
-    },
-    {
-        "path": "bigcode/the-stack-v2",
-        "name": "Rust",
-        "split": "train",
-        "text_field": "content",
-        "weight": 0.07,
-    },
-    {
-        "path": "bigcode/the-stack-v2",
-        "name": "Go",
-        "split": "train",
-        "text_field": "content",
-        "weight": 0.03,
-    },
-    {
-        "path": "bigcode/the-stack-v2",
-        "name": "Assembly",
-        "split": "train",
-        "text_field": "content",
-        "weight": 0.03,
-    },
-    # GitHub Code - Additional code sources (20% total)
-    {
-        "path": "codeparrot/github-code",
-        "name": "C",
-        "split": "train",
-        "text_field": "code",
-        "weight": 0.06,
-    },
-    {
-        "path": "codeparrot/github-code",
-        "name": "C++",
-        "split": "train",
-        "text_field": "code",
-        "weight": 0.05,
-    },
-    {
-        "path": "codeparrot/github-code",
-        "name": "Python",
-        "split": "train",
-        "text_field": "code",
-        "weight": 0.05,
-    },
-    {
-        "path": "codeparrot/github-code",
-        "name": "Rust",
-        "split": "train",
-        "text_field": "code",
-        "weight": 0.02,
-    },
-    {
-        "path": "codeparrot/github-code",
-        "name": "JavaScript",
-        "split": "train",
-        "text_field": "code",
-        "weight": 0.02,
-    },
-    # CodeSearchNet - Code with documentation (8%)
-    {
-        "path": "code_search_net",
-        "name": "python",
-        "split": "train",
-        "text_field": "code",
-        "weight": 0.03,
-    },
-    {
-        "path": "code_search_net",
-        "name": "c",
-        "split": "train",
-        "text_field": "code",
-        "weight": 0.03,
-    },
-    {
-        "path": "code_search_net",
-        "name": "cpp",
-        "split": "train",
-        "text_field": "code",
-        "weight": 0.02,
-    },
-    # Instruction-following code (2%)
-    {
-        "path": "nickrosh/Evol-Instruct-Code-80k-v1",
-        "split": "train",
-        "text_field": "instruction",
-        "weight": 0.01,
-    },
-    {
-        "path": "nickrosh/Evol-Instruct-Code-80k-v1",
-        "split": "train",
-        "text_field": "output",
-        "weight": 0.01,
-    },
-    # ========== REASONING & PROBLEM SOLVING (10%) ==========
-    # Competitive programming (3%)
-    {
-        "path": "deepmind/code_contests",
-        "split": "train",
-        "text_field": "description",
-        "weight": 0.015,
-    },
-    {
-        "path": "deepmind/code_contests",
-        "split": "train",
-        "text_field": "solutions",
-        "weight": 0.015,
-    },
-    # Math reasoning for algorithms (3%)
-    {
-        "path": "gsm8k",
-        "name": "main",
-        "split": "train",
-        "text_field": "question",
-        "weight": 0.015,
-    },
-    {
-        "path": "gsm8k",
-        "name": "main",
-        "split": "train",
-        "text_field": "answer",
-        "weight": 0.015,
-    },
-    # Chain-of-thought reasoning (4%)
-    {
-        "path": "Open-Orca/OpenOrca",
-        "split": "train",
-        "text_field": "question",
-        "weight": 0.02,
-    },
-    {
-        "path": "Open-Orca/OpenOrca",
-        "split": "train",
-        "text_field": "response",
-        "weight": 0.02,
-    },
-    # ========== GENERAL KNOWLEDGE (10%) ==========
-    # Wikipedia - technical knowledge (3%)
-    {
-        "path": "wikitext",
-        "name": "wikitext-103-raw-v1",
-        "split": "train",
-        "text_field": "text",
-        "weight": 0.03,
-    },
-    # Technical documentation (3%)
-    {"path": "EleutherAI/pile", "split": "train", "text_field": "text", "weight": 0.02},
-    {
-        "path": "HuggingFaceFW/fineweb-edu",
-        "name": "CC-MAIN-2024-10",
-        "split": "train",
-        "text_field": "text",
-        "weight": 0.01,
-    },
-    # Web text for diverse patterns (2%)
-    {"path": "openwebtext", "split": "train", "text_field": "text", "weight": 0.01},
-    {
-        "path": "c4",
-        "name": "en",
-        "split": "train",
-        "text_field": "text",
-        "weight": 0.01,
-    },
-    # ========== SPECIALIZED DATASETS ==========
-    # Build systems & tooling (2%)
-    {
-        "path": "codeparrot/github-code",
-        "name": "CMake",
-        "split": "train",
-        "text_field": "code",
-        "weight": 0.01,
-    },
-    {
-        "path": "codeparrot/github-code",
-        "name": "Makefile",
-        "split": "train",
-        "text_field": "code",
-        "weight": 0.01,
-    },
-    # StarCoder data (supplementary)
-    {
-        "path": "bigcode/starcoderdata",
-        "split": "train",
-        "text_field": "content",
-        "weight": 0.02,
-    },
-    # Technical Q&A (2%)
-    {
-        "path": "flax-syrup/stackexchange-programmers",
-        "split": "train",
-        "text_field": "text",
-        "weight": 0.01,
-    },
-    {
-        "path": "natural_instructions",
-        "split": "train",
-        "text_field": "definition",
-        "weight": 0.01,
-    },
+    {"path": "codeparrot/github-code", "split": "train", "text_field": "code", "weight": 0.20},
+    {"path": "code_search_net", "name": "python", "split": "train", "text_field": "code", "weight": 0.06},
+    {"path": "code_search_net", "name": "java", "split": "train", "text_field": "code", "weight": 0.05},
+    {"path": "code_search_net", "name": "cpp", "split": "train", "text_field": "code", "weight": 0.04},
+    {"path": "gsm8k", "split": "train", "text_field": "question", "weight": 0.05},
+    {"path": "gsm8k", "split": "train", "text_field": "answer", "weight": 0.05},
+    {"path": "math_dataset", "name": "main", "split": "train", "text_field": "question", "weight": 0.04},
+    {"path": "math_dataset", "name": "main", "split": "train", "text_field": "solution", "weight": 0.04},
+    {"path": "openwebtext", "split": "train", "text_field": "text", "weight": 0.06},
+    {"path": "wikitext", "name": "wikitext-103-raw-v1", "split": "train", "text_field": "text", "weight": 0.06},
+    {"path": "allenai/c4", "name": "en", "split": "train", "text_field": "text", "weight": 0.05},
 ]
+
 
 # Extended high-quality synthetic word pool for rich text generation
 # Enhanced with OS-level and systems programming terminology
@@ -1018,12 +809,9 @@ class ImprovedDataLoader:
             text_field = source["text_field"]
 
             try:
-                if sampler is not None:
-                    sample = sampler.sample()
-                else:
-                    dataset = source["dataset"]
-                    row_idx = random.randint(0, len(dataset) - 1)
-                    sample = dataset[row_idx]
+                if sampler is None:
+                    raise RuntimeError("No sampler configured for dataset.")
+                sample = sampler.sample()
                 text = self._extract_text(sample, text_field)
                 if text:
                     self.stats["dataset_batches"][idx] += 1
