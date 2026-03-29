@@ -1883,75 +1883,75 @@ def run_training_phase(
             )
             print(f"  Validation - Loss: {val_loss:.4f}, Perplexity: {perplexity:.2f}")
 
-            # Early stopping check
-            if val_loss < best_loss - config.get("min_delta", 0.001):
-                best_loss = val_loss
-                patience_counter = 0
-                # Save best checkpoint
-                best_path = os.path.join(
-                    config["checkpoint_dir"], f"{checkpoint_name}_best.pt"
-                )
-                torch.save(
-                     {
-                         "model_state_dict": model.state_dict(),
-                         "optimizer_state_dict": optimizer.state_dict(),
-                         "step": step,
-                         "loss": val_loss,
-                     },
-                     best_path,
-                 )
-             else:
-                 patience_counter += 1
-                 if patience_counter >= config.get("patience", 5):
-                     print(f"Early stopping triggered at step {step}")
-                     break
+        # Early stopping check
+        if val_loss < best_loss - config.get("min_delta", 0.001):
+            best_loss = val_loss
+            patience_counter = 0
+            # Save best checkpoint
+            best_path = os.path.join(
+                config["checkpoint_dir"], f"{checkpoint_name}_best.pt"
+            )
+            torch.save(
+                {
+                    "model_state_dict": model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "step": step,
+                    "loss": val_loss,
+                },
+                best_path,
+            )
+        else:
+            patience_counter += 1
+            if patience_counter >= config.get("patience", 5):
+                print(f"Early stopping triggered at step {step}")
+                break
 
-         # Time budget check
-         if time_budget and elapsed >= time_budget:
-             print(f"{phase_name} reached time budget after {completed_steps} steps.")
-             break
+        # Time budget check
+        if time_budget and elapsed >= time_budget:
+            print(f"{phase_name} reached time budget after {completed_steps} steps.")
+            break
 
-         # Checkpoint saving
-         if (step + 1) % config["save_every"] == 0:
-             checkpoint_path = os.path.join(
-                 config["checkpoint_dir"], f"{checkpoint_name}_step_{step + 1}.pt"
-             )
-             torch.save(
-                 {
-                     "model_state_dict": model.state_dict(),
-                     "optimizer_state_dict": optimizer.state_dict(),
-                     "scheduler_state_dict": scheduler.state_dict(),
-                     "step": step + 1,
-                     "loss": loss.item() * grad_accum_steps,
-                 },
-                 checkpoint_path,
-             )
-             print(f"Checkpoint saved: {checkpoint_path}")
-             # Cleanup old checkpoints to save space
-             cleanup_old_checkpoints(config["checkpoint_dir"], keep_last_n=3)
+        # Checkpoint saving
+        if (step + 1) % config["save_every"] == 0:
+            checkpoint_path = os.path.join(
+                config["checkpoint_dir"], f"{checkpoint_name}_step_{step + 1}.pt"
+            )
+            torch.save(
+                {
+                    "model_state_dict": model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "scheduler_state_dict": scheduler.state_dict(),
+                    "step": step + 1,
+                    "loss": loss.item() * grad_accum_steps,
+                },
+                checkpoint_path,
+            )
+            print(f"Checkpoint saved: {checkpoint_path}")
+            # Cleanup old checkpoints to save space
+            cleanup_old_checkpoints(config["checkpoint_dir"], keep_last_n=3)
 
-     total_time = time.time() - start_time
-     print(
-         f"{phase_name} completed in {total_time / 60:.1f} minutes "
-         f"({completed_steps} steps)."
-     )
+    total_time = time.time() - start_time
+    print(
+        f"{phase_name} completed in {total_time / 60:.1f} minutes "
+        f"({completed_steps} steps)."
+    )
 
-     # Save phase checkpoint
-     checkpoint_path = os.path.join(config["checkpoint_dir"], f"{checkpoint_name}.pt")
-     torch.save(
-         {
-             "model_state_dict": model.state_dict(),
-             "optimizer_state_dict": optimizer.state_dict(),
-             "scheduler_state_dict": scheduler.state_dict(),
-             "config": config,
-         },
-         checkpoint_path,
-     )
-     print(f"{phase_name} checkpoint saved: {checkpoint_path}")
-     # Cleanup old checkpoints to save space (keep phase checkpoint + recent ones)
-     cleanup_old_checkpoints(config["checkpoint_dir"], keep_last_n=5)
+    # Save phase checkpoint
+    checkpoint_path = os.path.join(config["checkpoint_dir"], f"{checkpoint_name}.pt")
+    torch.save(
+        {
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "scheduler_state_dict": scheduler.state_dict(),
+            "config": config,
+        },
+        checkpoint_path,
+    )
+    print(f"{phase_name} checkpoint saved: {checkpoint_path}")
+    # Cleanup old checkpoints to save space (keep phase checkpoint + recent ones)
+    cleanup_old_checkpoints(config["checkpoint_dir"], keep_last_n=5)
 
-     return model
+    return model
 
 
 def train_phase_1(model, config, language_datasets):
