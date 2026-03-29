@@ -9,7 +9,7 @@ from typing import Optional, List, Dict, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from datasets import load_dataset
+from datasets import DatasetNotFoundError, load_dataset
 from idir_model import IDIR
 
 try:
@@ -143,15 +143,11 @@ PHASE_TIME_BUDGETS = {
 # Extended high-quality dataset configuration - all ungated public datasets
 # Focused on coding, math, and reasoning content.
 LANGUAGE_DATASETS_CONFIG = [
-    {"path": "codeparrot/github-code", "split": "train", "text_field": "code", "weight": 0.20},
-    {"path": "code_search_net", "name": "python", "split": "train", "text_field": "code", "weight": 0.06},
-    {"path": "code_search_net", "name": "java", "split": "train", "text_field": "code", "weight": 0.05},
-    {"path": "code_search_net", "name": "cpp", "split": "train", "text_field": "code", "weight": 0.04},
-    {"path": "gsm8k", "split": "train", "text_field": "question", "weight": 0.05},
-    {"path": "gsm8k", "split": "train", "text_field": "answer", "weight": 0.05},
-    {"path": "math_dataset", "name": "main", "split": "train", "text_field": "question", "weight": 0.04},
-    {"path": "math_dataset", "name": "main", "split": "train", "text_field": "solution", "weight": 0.04},
-    {"path": "openwebtext", "split": "train", "text_field": "text", "weight": 0.06},
+    {"path": "gsm8k", "split": "train", "text_field": "question", "weight": 0.08},
+    {"path": "gsm8k", "split": "train", "text_field": "answer", "weight": 0.08},
+    {"path": "math_dataset", "name": "main", "split": "train", "text_field": "question", "weight": 0.07},
+    {"path": "math_dataset", "name": "main", "split": "train", "text_field": "solution", "weight": 0.07},
+    {"path": "openwebtext", "split": "train", "text_field": "text", "weight": 0.10},
     {"path": "wikitext", "name": "wikitext-103-raw-v1", "split": "train", "text_field": "text", "weight": 0.06},
     {"path": "allenai/c4", "name": "en", "split": "train", "text_field": "text", "weight": 0.05},
 ]
@@ -1526,46 +1522,44 @@ def load_language_datasets(config):
         if spec.get("name"):
             dataset_id = f"{dataset_id}/{spec['name']}"
 
+        dataset_iterable = None
         try:
-            dataset_stream = load_dataset(
+            dataset_iterable = load_dataset(
                 spec["path"],
                 spec.get("name"),
                 split=spec.get("split", "train"),
                 streaming=True,
             )
-            sampler = StreamingDatasetSampler(dataset_stream, buffer_size=buffer_size)
-            loaded.append(
-                {
-                    "id": dataset_id,
-                    "sampler": sampler,
-                    "text_field": spec.get("text_field", "text"),
-                    "weight": spec.get("weight", 1.0),
-                }
-            )
-            print(
-                f"Streaming dataset ready: {dataset_id} "
-                f"(buffer={buffer_size}, weight={spec.get('weight', 1.0)})"
-            )
-
-        except Exception as exc:
-            print(
-                f"Streaming unavailable for {dataset_id}: {exc}. Falling back to eager iterator."
-            )
-            dataset = load_dataset(
+        except DatasetNotFoundError as exc:
+            print(f"{dataset_id} not found ({exc}); skipping.")
+            continue
+        except RuntimeError as exc:
+            message = str(exc)
+            if "Dataset scripts are no longer supported" in message:
+                print(
+                    f"{dataset_id} requires dataset script ({message}); skipping ungated pool."
+                )
+                continue
+            print(f"Streaming failed for {dataset_id} ({message}); falling back to eager iterator.")
+            dataset_iterable = load_dataset(
                 spec["path"],
                 spec.get("name"),
                 split=spec.get("split", "train"),
                 streaming=False,
             )
-            sampler = StreamingDatasetSampler(dataset, buffer_size=buffer_size)
-            loaded.append(
-                {
-                    "id": dataset_id,
-                    "sampler": sampler,
-                    "text_field": spec.get("text_field", "text"),
-                    "weight": spec.get("weight", 1.0),
-                }
-            )
+        sampler = StreamingDatasetSampler(dataset_iterable, buffer_size=buffer_size)
+        loaded.append(
+            {
+                "id": dataset_id,
+                "sampler": sampler,
+                "text_field": spec.get("text_field", "text"),
+                "weight": spec.get("weight", 1.0),
+            }
+        )
+        print(
+            f"Streaming dataset ready: {dataset_id} "
+            f"(buffer={buffer_size}, weight={spec.get('weight', 1.0)})"
+        )
 
     if not loaded:
         print("WARNING: No datasets loaded. Using synthetic data only.")
