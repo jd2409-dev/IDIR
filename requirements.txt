@@ -1,0 +1,27 @@
+# IDIR-KS Dependencies
+# Knowledge-Dense Implicit Reasoning with Inference-Time Scaling
+
+torch>=2.0.0
+numpy>=1.24.0
+datasets>=2.14.0  # HuggingFace datasets
+transformers>=4.30.0  # For tokenizers
+accelerate>=0.20.0  # For distributed training
+tqdm>=4.65.0
+pyyaml>=6.0
+matplotlib>=3.7.0  # For plotting results
+tensorboard>=2.13.0  # For logging
+wandb>=0.15.0  # Optional: Weights & Biases logging
+scikit-learn>=1.3.0  # For evaluation metrics
+pandas>=2.0.0  # For data handling
+scipy>=1.10.0  # For scientific computing
+
+# Optional dependencies for specific features
+sentencepiece>=0.1.99  # For tokenizers
+protobuf>=3.20.0  # Required by some tokenizers
+
+# Development dependencies
+pytest>=7.4.0  # Testing
+black>=23.7.0  # Code formatting
+isort>=5.12.0  # Import sorting
+flake8>=6.0.0  # Linting
+mypy>=1.4.0  # Type checking

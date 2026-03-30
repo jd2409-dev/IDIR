@@ -1,49 +1,84 @@
-import os
+"""Clear all cache directories for IDIR-KS"""
+
 import shutil
-
-CACHE_TARGETS = [
-    ".ruff_cache",
-    "training.log",
-    "training_error.log",
-]
+import os
+from pathlib import Path
 
 
-def remove_path(path):
-    if not os.path.exists(path):
-        return False
-    if os.path.isdir(path):
-        shutil.rmtree(path, ignore_errors=True)
-    else:
-        os.remove(path)
-    return True
+def clear_all_cache():
+    """Clear all cache directories"""
+
+    cache_dirs = [
+        "./cache",
+        "./__pycache__",
+        "./.pytest_cache",
+        "./.mypy_cache",
+        "./.cache",
+    ]
+
+    # Add Python cache recursively
+    for root, dirs, files in os.walk("."):
+        for d in dirs:
+            if d == "__pycache__" or d == ".pytest_cache" or d.endswith(".egg-info"):
+                cache_dirs.append(os.path.join(root, d))
+
+    print("Clearing cache directories...")
+    cleared_count = 0
+
+    for cache_dir in cache_dirs:
+        if os.path.exists(cache_dir):
+            try:
+                shutil.rmtree(cache_dir)
+                print(f"  Cleared: {cache_dir}")
+                cleared_count += 1
+            except Exception as e:
+                print(f"  Failed to clear {cache_dir}: {e}")
+
+    print(f"\nCleared {cleared_count} cache directories")
+
+    # Create fresh cache directory
+    os.makedirs("./cache", exist_ok=True)
+    print("Created fresh ./cache directory")
 
 
-def prune_pycache(root_dir):
-    removed = []
-    for current_path, dirs, _ in os.walk(root_dir):
+def clean_python_files():
+    """Remove compiled Python files"""
+    print("\nRemoving compiled Python files...")
+
+    for root, dirs, files in os.walk("."):
+        # Remove __pycache__ directories
         if "__pycache__" in dirs:
-            cache_path = os.path.join(current_path, "__pycache__")
-            shutil.rmtree(cache_path, ignore_errors=True)
-            removed.append(cache_path)
-    return removed
+            pycache_path = os.path.join(root, "__pycache__")
+            try:
+                shutil.rmtree(pycache_path)
+                print(f"  Removed: {pycache_path}")
+            except Exception as e:
+                print(f"  Failed to remove {pycache_path}: {e}")
 
-
-def main():
-    removed_any = False
-
-    for target in CACHE_TARGETS:
-        if remove_path(target):
-            print(f"Removed cache target: {target}")
-            removed_any = True
-
-    erased_pycache = prune_pycache('.')
-    for path in erased_pycache:
-        print(f"Removed __pycache__: {path}")
-        removed_any = True
-
-    if not removed_any:
-        print("No caches found to remove.")
+        # Remove .pyc files
+        for file in files:
+            if file.endswith((".pyc", ".pyo")):
+                filepath = os.path.join(root, file)
+                try:
+                    os.remove(filepath)
+                    print(f"  Removed: {filepath}")
+                except Exception as e:
+                    print(f"  Failed to remove {filepath}: {e}")
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    sys.path.insert(0, ".")
+
+    print("=" * 60)
+    print("IDIR-KS Cache Cleaner")
+    print("=" * 60)
+    print()
+
+    clear_all_cache()
+    clean_python_files()
+
+    print("\n" + "=" * 60)
+    print("Cache clearing complete!")
+    print("=" * 60)
