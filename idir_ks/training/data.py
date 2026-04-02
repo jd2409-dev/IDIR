@@ -188,6 +188,40 @@ class WeightedDataset(Dataset):
         }
 
 
+class _SyntheticDatasetWrapper(Dataset):
+    """Wraps synthetic data samples into a PyTorch Dataset"""
+
+    def __init__(
+        self,
+        samples: List[Dict],
+        tokenizer: Optional[Callable] = None,
+        max_length: int = 1024,
+    ):
+        self.samples = samples
+        self.tokenizer = tokenizer
+        self.max_length = max_length
+
+    def __len__(self) -> int:
+        return len(self.samples)
+
+    def __getitem__(self, idx: int) -> Dict:
+        text = self.samples[idx]["text"]
+
+        if self.tokenizer:
+            tokens = self.tokenizer(text, max_length=self.max_length)
+            input_ids = tokens["input_ids"]
+        else:
+            input_ids = [ord(c) % 256 for c in text[: self.max_length]]
+            input_ids = input_ids + [0] * (self.max_length - len(input_ids))
+
+        labels = input_ids[1:] + [0]
+
+        return {
+            "input_ids": torch.tensor(input_ids, dtype=torch.long),
+            "labels": torch.tensor(labels, dtype=torch.long),
+        }
+
+
 def create_composite_dataset(
     code_path: Optional[str] = None,
     math_path: Optional[str] = None,
@@ -246,6 +280,25 @@ def create_composite_dataset(
         datasets["language"] = LanguageDataset(
             language_path, tokenizer=tokenizer, max_length=max_length
         )
+
+    # Fall back to synthetic data when no paths provided
+    if not datasets:
+        from ..data.synthetic_data import SyntheticDataGenerator
+
+        generator = SyntheticDataGenerator(seed=seed)
+        samples_per_domain = max(100, total_samples // len(weights))
+
+        for domain in weights:
+            if domain == "code":
+                samples = generator.generate_code_samples(samples_per_domain)
+            elif domain == "math":
+                samples = generator.generate_math_samples(samples_per_domain)
+            elif domain == "logic":
+                samples = generator.generate_logic_samples(samples_per_domain)
+            else:
+                samples = generator.generate_language_samples(samples_per_domain)
+
+            datasets[domain] = _SyntheticDatasetWrapper(samples, tokenizer, max_length)
 
     # Normalize weights for available datasets
     available_weights = {k: weights[k] for k in datasets.keys()}
