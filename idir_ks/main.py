@@ -9,13 +9,17 @@ import random
 import numpy as np
 from pathlib import Path
 
-from model.idir_ks_model import IDIRKSModel, create_idir_ks_base, create_idir_ks_large
-from training.trainer import IDIRKSTrainer
-from training.data import create_composite_dataset, create_dataloader
-from training.hybrid_optimizer import create_hybrid_optimizer
-from evaluation.ablations import create_ablation_variant, AblationStudy
-from evaluation.metrics import Evaluator, format_results
-from utils.config import (
+from idir_ks.model.idir_ks_model import (
+    IDIRKSModel,
+    create_idir_ks_base,
+    create_idir_ks_large,
+)
+from idir_ks.training.trainer import IDIRKSTrainer
+from idir_ks.training.data import create_composite_dataset, create_dataloader
+from idir_ks.training.hybrid_optimizer import create_hybrid_optimizer
+from idir_ks.evaluation.ablations import create_ablation_variant, AblationStudy
+from idir_ks.evaluation.metrics import Evaluator, format_results
+from idir_ks.utils.config import (
     IDIRKSConfig,
     get_base_config,
     get_large_config,
