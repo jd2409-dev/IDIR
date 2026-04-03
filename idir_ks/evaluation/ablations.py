@@ -86,7 +86,31 @@ def create_ablation_variant(variant: str, **kwargs) -> IDIRKSModel:
 
     config.update(kwargs)
 
-    return create_idir_ks_base(**config)
+    # Separate model config from trainer/optimizer config
+    model_keys = {
+        "vocab_size",
+        "dim",
+        "num_layers",
+        "num_heads",
+        "num_experts",
+        "expert_top_k",
+        "num_memories",
+        "max_seq_len",
+        "dropout",
+        "convergence_threshold",
+        "max_solver_steps",
+        "min_solver_steps",
+        "enable_adaptive",
+        "num_trajectories",
+        "trajectory_noise",
+        "use_implicit_solver",
+        "use_memory",
+        "use_moe",
+        "use_factorization",
+    }
+    model_config = {k: v for k, v in config.items() if k in model_keys}
+
+    return create_idir_ks_base(**model_config)
 
 
 class AblationStudy:

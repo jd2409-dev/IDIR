@@ -99,7 +99,8 @@ class SyntheticDataGenerator:
                     else str((-b + (b**2 - 4 * a * c) ** 0.5) / (2 * a))
                 )
             elif "speed" in template:
-                ans = str(d // t) if "t" in dir() else str(self.rng.randint(20, 100))
+                t = self.rng.randint(1, 10)
+                ans = str(d // t)
             elif "area" in template:
                 l, w = self.rng.randint(2, 20), self.rng.randint(2, 20)
                 ans = str(l * w)
@@ -154,6 +155,27 @@ class SyntheticDataGenerator:
             "The ground is wet",
         ]
 
+        major_premises = [
+            "All mammals are warm-blooded",
+            "All squares are rectangles",
+            "All metals conduct electricity",
+            "No reptiles have fur",
+        ]
+
+        minor_premises = [
+            "Dogs are mammals",
+            "A square has four equal sides",
+            "Copper is a metal",
+            "Snakes are reptiles",
+        ]
+
+        syllogism_conclusions = [
+            "Dogs are warm-blooded",
+            "A square is a rectangle",
+            "Copper conducts electricity",
+            "Snakes do not have fur",
+        ]
+
         conditions = [
             "it is raining",
             "x is greater than 5",
@@ -172,7 +194,7 @@ class SyntheticDataGenerator:
             "What is the next number in the sequence: 2, 4, 8, 16, ?",
             "If A implies B, and B implies C, what can we conclude?",
             "Which of these is not like the others?",
-            "Complete the analogy: Book is to reading as {a} is to {b}.",
+            "Complete the analogy: Book is to reading as fork is to eating.",
         ]
 
         puzzles = [
@@ -197,12 +219,22 @@ class SyntheticDataGenerator:
                 elif "implies" in q:
                     opts = ["A implies C", "B implies A", "Nothing", "C implies A"]
                     ans = "A implies C"
+                elif "not like" in q:
+                    opts = ["Apple", "Banana", "Carrot", "Date"]
+                    ans = "Carrot"
                 else:
                     opts = ["Option A", "Option B", "Option C", "Option D"]
                     ans = self.rng.choice(opts)
 
                 sample = template.format(
                     question=q, options=", ".join(opts), answer=ans
+                )
+            elif "Syllogism" in template:
+                idx = self.rng.randint(0, len(major_premises) - 1)
+                sample = template.format(
+                    major=major_premises[idx],
+                    minor=minor_premises[idx],
+                    conclusion=syllogism_conclusions[idx],
                 )
             else:
                 sample = template.format(
