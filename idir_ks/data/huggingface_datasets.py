@@ -83,14 +83,12 @@ class HuggingFaceDatasetWrapper(Dataset):
                             config,
                             split=self.split,
                             cache_dir=self.cache_dir,
-                            trust_remote_code=True,
                         )
                     else:
                         dataset = load_dataset(
                             self.dataset_name,
                             split=self.split,
                             cache_dir=self.cache_dir,
-                            trust_remote_code=True,
                         )
 
                     # Limit samples

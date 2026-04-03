@@ -12,14 +12,9 @@ import random
 import os
 
 
-# High-quality ungated datasets (sorted by quality, all open/ungated)
+# High-quality ungated datasets (confirmed open, no loading scripts, streaming-safe)
 OPEN_DATASETS = {
     "code": [
-        {
-            "name": "iamtarun/python_code_instructions_18k_alpaca",
-            "text_col": "output",
-            "desc": "Python code instructions (18k samples)",
-        },
         {
             "name": "nampdn-ai/tiny-codes",
             "text_col": "code",
@@ -33,21 +28,12 @@ OPEN_DATASETS = {
             "split": "train",
             "desc": "GSM8K math word problems",
         },
-        {
-            "name": "math-ai/AutoMathText",
-            "text_col": "text",
-            "desc": "Auto-generated math text",
-        },
     ],
     "logic": [
         {
-            "name": "tasksource/bigbench",
-            "text_col": "inputs",
-            "desc": "BIG-bench logical reasoning tasks",
-        },
-        {
             "name": "allenai/ai2_arc",
             "text_col": "question",
+            "split": "train",
             "desc": "AI2 ARC reasoning questions",
         },
     ],
@@ -132,14 +118,12 @@ def try_load_hf_dataset(
                 config_name,
                 split=split,
                 streaming=True,
-                trust_remote_code=True,
             )
         else:
             ds = load_dataset(
                 name,
                 split=split,
                 streaming=True,
-                trust_remote_code=True,
             )
 
         samples = []

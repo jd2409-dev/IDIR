@@ -256,7 +256,7 @@ def main():
     print(f"  Model size (FP16): {model_mb / 2:.1f} MB")
 
     if device == "cuda":
-        gpu_mem = torch.cuda.get_device_properties(0).total_mem / (1024**3)
+        gpu_mem = torch.cuda.get_device_properties(0).total_memory / (1024**3)
         print(f"  GPU memory: {gpu_mem:.1f} GB")
         print(
             f"  Model uses ~{model_mb / 2:.1f} MB in FP16 (of {gpu_mem * 1024:.0f} MB)"
