@@ -269,16 +269,14 @@ class IDIRKSTrainer:
 
             if accum_buffers["count"] > 0:
                 avg_loss = accum_buffers["loss"] / accum_buffers["count"]
+                avg_ce = accum_buffers["ce"] / accum_buffers["count"]
                 epoch_losses.append(avg_loss)
                 self.loss_history.append(avg_loss)
 
             step_time = time.time() - step_start
             self.step_times.append(step_time)
 
-            # Reset accum buffers
-            accum_buffers = {"loss": 0, "ce": 0, "count": 0}
-
-            # Logging
+            # Logging (before reset)
             if self.step % self.log_interval == 0 and len(epoch_losses) > 0:
                 lr = self.optimizer.get_lr()
                 elapsed = time.time() - self.start_time if self.start_time else 0
@@ -286,12 +284,15 @@ class IDIRKSTrainer:
                 print(
                     f"Step {self.step:5d} | "
                     f"Loss: {avg_loss:.4f} | "
-                    f"CE: {accum_buffers.get('ce', 0):.4f} | "
+                    f"CE: {avg_ce:.4f} | "
                     f"Phase: {self.phase} | "
                     f"LR: {lr['adam']:.2e} | "
                     f"Time: {step_time:.3f}s | "
                     f"ETA: {remaining / 60:.1f}m"
                 )
+
+            # Reset accum buffers
+            accum_buffers = {"loss": 0, "ce": 0, "count": 0}
 
             # Periodic checkpoint
             if self.step % self.save_interval == 0 and self.step > 0:

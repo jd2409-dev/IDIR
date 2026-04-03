@@ -322,9 +322,8 @@ def main():
     print(f"  Steps completed: {trainer.step}")
     print(f"  Epochs completed: {trainer.epoch}")
     print(f"  Best val loss: {trainer.best_val_loss:.4f}")
-    print(
-        f"  Final loss: {trainer.loss_history[-1]:.4f if trainer.loss_history else 'N/A'}"
-    )
+    final_loss = f"{trainer.loss_history[-1]:.4f}" if trainer.loss_history else "N/A"
+    print(f"  Final loss: {final_loss}")
     print(f"  Model quality: {'PASS' if quality_ok else 'NEEDS MORE TRAINING'}")
     print(f"  Checkpoints: {args.checkpoint_dir}/")
     print("=" * 70)
