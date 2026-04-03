@@ -78,8 +78,9 @@ class IDIRKSTrainer:
         else:
             phase = "convergence"
 
-        if phase != self.phase:
-            print(f"Switching to phase: {phase}")
+        if phase != self.phase or self.optimizer is None:
+            if phase != self.phase:
+                print(f"Switching to phase: {phase}")
             self.phase = phase
             self.optimizer = create_hybrid_optimizer(self.model, phase=self.phase)
 

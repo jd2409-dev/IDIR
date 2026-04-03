@@ -67,6 +67,9 @@ def create_dataloaders(config: IDIRKSConfig):
     """Create train and validation dataloaders"""
     data = config.data
 
+    # Cap max_length to model's max_seq_len to avoid embedding index errors
+    max_length = min(data.max_length, config.model.max_seq_len)
+
     # Create dataset
     train_dataset = create_composite_dataset(
         code_path=data.code_path,
@@ -79,7 +82,7 @@ def create_dataloaders(config: IDIRKSConfig):
             "logic": data.logic_weight,
             "language": data.language_weight,
         },
-        max_length=data.max_length,
+        max_length=max_length,
         total_samples=data.total_samples,
         tokenizer=None,  # Would use real tokenizer
         seed=config.seed,
@@ -106,7 +109,7 @@ def create_dataloaders(config: IDIRKSConfig):
             "logic": 0.25,
             "language": 0.25,
         },
-        max_length=data.max_length,
+        max_length=max_length,
         total_samples=1000,
         tokenizer=None,
         seed=config.seed + 100,
