@@ -4,7 +4,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from torch.cuda.amp import autocast, GradScaler
+from torch.amp import autocast as amp_autocast
+from torch.amp.grad_scaler import GradScaler
 from typing import Dict, Optional, Callable
 import time
 import os
@@ -78,7 +79,7 @@ class IDIRKSTrainer:
 
         # Mixed precision
         self.use_amp = device == "cuda"
-        self.scaler = GradScaler() if self.use_amp else None
+        self.scaler = GradScaler("cuda") if self.use_amp else None
 
         # Initialize optimizer
         self.optimizer = None
@@ -121,7 +122,7 @@ class IDIRKSTrainer:
         labels = batch["labels"].to(self.device, non_blocking=True)
 
         if self.use_amp and use_amp:
-            with autocast():
+            with amp_autocast("cuda"):
                 logits = self.model(input_ids)
                 ce_loss = F.cross_entropy(
                     logits.view(-1, logits.size(-1)),
@@ -171,7 +172,7 @@ class IDIRKSTrainer:
         normalize_factor = self.config["grad_accum_steps"]
 
         if self.use_amp:
-            with autocast():
+            with amp_autocast("cuda"):
                 loss, loss_dict = self._compute_loss(batch, use_amp=False)
                 loss = loss / normalize_factor
 
