@@ -236,6 +236,60 @@ def get_small_config() -> IDIRKSConfig:
     return config
 
 
+def get_rtx3050_config() -> IDIRKSConfig:
+    """
+    RTX 3050 4GB optimized configuration.
+    Designed to run for ~1 hour with no OOM or storage errors.
+
+    Model: ~50M params (fits in 4GB with mixed precision)
+    Vocab: 8192 (byte-level, no external tokenizer needed)
+    Seq: 128 tokens (short but trains effectively)
+    Batch: 4 with grad_accum=8 (effective batch 32)
+    """
+    config = IDIRKSConfig()
+
+    # Tiny model that fits in 4GB
+    config.model.vocab_size = 8192
+    config.model.dim = 192
+    config.model.num_layers = 4
+    config.model.num_heads = 4
+    config.model.num_experts = 4
+    config.model.expert_top_k = 2
+    config.model.num_memories = 512
+    config.model.max_seq_len = 128
+    config.model.dropout = 0.1
+    config.model.convergence_threshold = 1e-3
+    config.model.max_solver_steps = 4
+    config.model.min_solver_steps = 2
+    config.model.enable_adaptive = True
+    config.model.num_trajectories = 1
+    config.model.use_implicit_solver = True
+    config.model.use_memory = True
+    config.model.use_moe = True
+    config.model.use_factorization = True
+
+    # Data: short sequences for speed + memory
+    config.data.max_length = 128
+    config.data.num_workers = 0
+    config.data.pin_memory = False
+    config.data.total_samples = 10000
+
+    # Training: optimized for 1-hour RTX 3050 run
+    config.training.batch_size = 4
+    config.training.log_interval = 10
+    config.training.save_interval = 100
+    config.training.max_steps = 1200
+    config.training.grad_clip = 1.0
+    config.training.use_multi_trajectory = False
+    config.training.num_trajectories = 1
+
+    # Device
+    config.device = "cuda"
+    config.seed = 42
+
+    return config
+
+
 def get_ablation_config(variant: str) -> IDIRKSConfig:
     """Get configuration for ablation variant"""
     config = IDIRKSConfig()
