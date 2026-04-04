@@ -222,17 +222,22 @@ def get_large_config() -> IDIRKSConfig:
 
 
 def get_small_config() -> IDIRKSConfig:
-    """Small IDIR-KS configuration for testing"""
+    """Small IDIR-KS configuration for testing / low-VRAM GPUs"""
     config = IDIRKSConfig()
+    config.model.vocab_size = 16384
     config.model.dim = 256
     config.model.num_layers = 2
     config.model.num_heads = 4
     config.model.num_experts = 4
-    config.model.num_memories = 1024
-    config.model.max_seq_len = 512
-    config.model.max_solver_steps = 6
+    config.model.num_memories = 256
+    config.model.max_seq_len = 128
+    config.model.max_solver_steps = 4
     config.model.min_solver_steps = 2
+    config.training.batch_size = 2
+    config.training.gradient_accumulation_steps = 8
     config.training.max_steps = 5000
+    config.data.num_workers = 0
+    config.data.pin_memory = False
     return config
 
 

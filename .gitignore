@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+*.egg
+
+# Virtual env
+venv/
+.env/
+
+# Cache
+cache/
+.ruff_cache/
+
+# Checkpoints (large binary files)
+checkpoints/
+*.pt
+!requirements.txt
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -20,6 +20,9 @@ import argparse
 import shutil
 from pathlib import Path
 
+# Reduce memory fragmentation
+os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
+
 # Add idir_ks to path
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -27,6 +30,7 @@ import torch
 from idir_ks.main import create_model, create_dataloaders, set_seed, train_model
 from idir_ks.utils.config import IDIRKSConfig, get_base_config
 from idir_ks.training.trainer import IDIRKSTrainer
+from idir_ks.utils.tokenizer import IDIRSTokenizer
 
 
 class DiskManager:
@@ -125,7 +129,9 @@ def estimate_space(model, num_checkpoints=6):
     }
 
 
-def train_with_20gb_limit(config_path=None, size="base", device="cuda", seed=42):
+def train_with_20gb_limit(
+    config_path=None, size="base", device="cuda", seed=42, tokenizer_path=None
+):
     """Train with 20GB disk limit"""
 
     print("=" * 80)
@@ -154,6 +160,22 @@ def train_with_20gb_limit(config_path=None, size="base", device="cuda", seed=42)
 
     config.device = device
     config.seed = seed
+    # Memory-efficient defaults for low-VRAM GPUs
+    config.data.num_workers = 0
+    config.data.pin_memory = False
+    if config.training.batch_size > 8:
+        config.training.gradient_accumulation_steps = max(
+            1, config.training.batch_size // 8
+        )
+        config.training.batch_size = 8
+
+    # Load tokenizer if provided
+    tokenizer = None
+    if tokenizer_path:
+        print(f"\n🔤 Loading tokenizer from {tokenizer_path}...")
+        tokenizer = IDIRSTokenizer(model_path=tokenizer_path)
+        config.model.vocab_size = tokenizer.vocab_size
+        print(f"   Vocabulary size: {tokenizer.vocab_size}")
 
     # Force checkpoints to root folder
     config.training.checkpoint_dir = "."
@@ -188,7 +210,7 @@ def train_with_20gb_limit(config_path=None, size="base", device="cuda", seed=42)
 
     # Create dataloaders
     print(f"\n📚 Creating dataloaders...")
-    train_dl, val_dl = create_dataloaders(config)
+    train_dl, val_dl = create_dataloaders(config, tokenizer)
 
     # Create trainer with disk manager
     print(f"\n🚀 Initializing trainer...")
@@ -202,11 +224,11 @@ def train_with_20gb_limit(config_path=None, size="base", device="cuda", seed=42)
         original_trainer_init(self, *args, **kwargs)
         self._disk_manager = disk_manager
 
-    def patched_save(self, filename):
+    def patched_save(self, filename, save_optimizer=False):
         if not self._disk_manager.before_save():
             print(f"Skipping checkpoint save due to disk limit")
             return
-        original_save_checkpoint(self, filename)
+        original_save_checkpoint(self, filename, save_optimizer=save_optimizer)
         self._disk_manager.after_save(self.checkpoint_dir / filename)
 
     IDIRKSTrainer.__init__ = patched_init
@@ -288,6 +310,12 @@ def main():
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument(
+        "--tokenizer-path",
+        type=str,
+        default=None,
+        help="Path to SentencePiece model file",
+    )
+    parser.add_argument(
         "--cleanup", action="store_true", help="Clean up old checkpoints after training"
     )
     parser.add_argument(
@@ -302,7 +330,11 @@ def main():
 
     # Train
     train_with_20gb_limit(
-        config_path=args.config, size=args.size, device=args.device, seed=args.seed
+        config_path=args.config,
+        size=args.size,
+        device=args.device,
+        seed=args.seed,
+        tokenizer_path=args.tokenizer_path,
     )
 
     if args.cleanup:
